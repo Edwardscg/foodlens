@@ -1,0 +1,13 @@
+# Loaded only from the test classpath. Never connect tests to the personal .env DB.
+spring:
+  datasource:
+    url: jdbc:h2:mem:smartfoodai_test;MODE=MySQL;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ''
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+app:
+  jwt:
+    secret: synthetic-test-secret-not-for-real-tokens-0123456789

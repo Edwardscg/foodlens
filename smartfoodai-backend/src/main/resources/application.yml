@@ -1,6 +1,6 @@
 spring:
   application:
-    name: foodlens-backend
+    name: smartfoodai-backend
   datasource:
     url: jdbc:mysql://${MYSQLHOST}:${MYSQLPORT}/${MYSQLDATABASE}
     username: ${MYSQLUSER}
@@ -12,23 +12,8 @@ spring:
       ddl-auto: validate
     open-in-view: false
 
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health
-
 app:
   jwt:
     secret: ${JWT_SECRET}
-    access-token-minutes: 15
+    access-token-minutes: 20
     refresh-token-days: 30
-  gemini:
-    api-key: ${GEMINI_API_KEY:}
-  fdc:
-    api-key: ${FDC_API_KEY:DEMO_KEY}
-  storage:
-    endpoint: ${STORAGE_ENDPOINT:}
-    access-key: ${STORAGE_ACCESS_KEY:}
-    secret-key: ${STORAGE_SECRET_KEY:}
-    bucket: ${STORAGE_BUCKET:}

@@ -1,0 +1,17 @@
+# Local credentials
+.env
+.env.*
+!.env.example
+.ai/
+docs/decisions/
+.local-tools/
+*.log
+
+# Private workspace documentation
+AGENTS.md
+MASTER-PLAN.md
+PACKAGE-MANIFEST.md
+PROJECT-CONTEXT.md
+START-HERE.md
+/docs/**/*.md
+/design/**/*.md
