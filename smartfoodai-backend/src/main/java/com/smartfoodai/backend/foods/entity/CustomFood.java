@@ -1,6 +1,10 @@
 package com.smartfoodai.backend.foods.entity;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
@@ -8,6 +12,10 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "custom_foods")
+@NoArgsConstructor
+@AllArgsConstructor
+@Getter
+@Setter
 public class CustomFood {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
