@@ -89,9 +89,68 @@ class AuthController extends ChangeNotifier {
   }
 
   Future<void> _rotateOnce() async {
-    final next = await _api.refresh(_session!.refreshToken);
-    _session = next;
+    final previous = _session;
+    if (previous == null)
+      throw const ApiFailure('Inicia sesión nuevamente.', status: 401);
+    final next = await _api.refresh(previous.refreshToken);
+    if (!identical(_session, previous) || _disposed) {
+      throw const ApiFailure('La sesión cambió.', status: 401);
+    }
     await _store.save(next);
+    if (!identical(_session, previous) || _disposed) {
+      throw const ApiFailure('La sesión cambió.', status: 401);
+    }
+    _session = next;
+  }
+
+  // Renew access before a request. Only reads may retry after a rejected token.
+  Future<T> withAccessToken<T>(
+      Future<T> Function(String token) operation, {
+        bool retryUnauthorized = false,
+      }) async {
+    final owner = user?.id;
+    void checkSession() {
+      if (_disposed ||
+          status != AuthStatus.signedIn ||
+          owner == null ||
+          user?.id != owner ||
+          _session == null) {
+        throw const ApiFailure('Inicia sesión nuevamente.', status: 401);
+      }
+    }
+
+    checkSession();
+    try {
+      final refreshed = _session!.needsRefresh;
+      if (refreshed) await _rotate();
+      checkSession();
+      T result;
+      try {
+        result = await operation(_session!.accessToken);
+      } on ApiFailure catch (error) {
+        if (error.status != 401 || refreshed) rethrow;
+        checkSession();
+        await _rotate();
+        checkSession();
+        if (!retryUnauthorized) {
+          throw const ApiFailure(
+            'Tu sesión se renovó. Vuelve a guardar el alimento.',
+          );
+        }
+        result = await operation(_session!.accessToken);
+      }
+      checkSession();
+      return result;
+    } on ApiFailure catch (error) {
+      if (!_disposed &&
+          error.status == 401 &&
+          user?.id == owner &&
+          status == AuthStatus.signedIn) {
+        await _discardSession();
+        _notify();
+      }
+      rethrow;
+    }
   }
 
   Future<void> _discardSession() async {

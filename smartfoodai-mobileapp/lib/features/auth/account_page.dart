@@ -34,6 +34,16 @@ class AccountPage extends ConsumerWidget {
                 'La configuración de tu perfil nutricional estará disponible en una próxima entrega.',
               ),
               const SizedBox(height: 32),
+              ListTile(
+                leading: const Icon(Icons.restaurant_menu),
+                title: const Text('Mis alimentos'),
+                subtitle: const Text(
+                  'Crea y consulta tus alimentos personalizados',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: auth.busy ? null : () => context.push('/foods'),
+              ),
+              const SizedBox(height: 32),
               if (auth.message != null) ...[
                 Text(auth.message!),
                 const SizedBox(height: 16),
