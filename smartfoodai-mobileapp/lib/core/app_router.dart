@@ -6,6 +6,8 @@ import '../features/auth/auth_controller.dart';
 import '../features/auth/auth_page.dart';
 import '../features/auth/account_page.dart';
 import '../features/home/home_page.dart';
+import '../features/foods/my_foods_page.dart';
+import '../features/foods/create_food_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final auth = ref.read(authProvider);
@@ -21,7 +23,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (auth.status == AuthStatus.signedOut) {
         return path == '/login' || path == '/register' ? null : '/login';
       }
-      return path == '/home' || path == '/account' ? null : '/home';
+      return {'/home', '/account', '/foods', '/foods/create'}.contains(path)
+          ? null
+          : '/home';
     },
     routes: [
       GoRoute(
@@ -41,6 +45,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: '/home', builder: (_, __) => const HomePage()),
       GoRoute(path: '/account', builder: (_, __) => const AccountPage()),
+      GoRoute(path: '/foods', builder: (_, __) => const MyFoodsPage()),
+      GoRoute(
+        path: '/foods/create',
+        builder: (_, __) => const CreateFoodPage(),
+      ),
     ],
   );
   ref.onDispose(router.dispose);
