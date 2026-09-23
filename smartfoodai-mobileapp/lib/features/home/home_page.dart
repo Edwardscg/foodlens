@@ -78,7 +78,7 @@ class HomePage extends ConsumerWidget {
                     ),
                     const SizedBox(height: 10),
                     const Text(
-                      'El resumen estará disponible cuando puedas guardar tus comidas.',
+                      'El resumen estará disponible cuando guardes tus comidas.',
                       style: TextStyle(color: AppTheme.muted),
                     ),
                     const SizedBox(height: 22),
@@ -112,23 +112,31 @@ class HomePage extends ConsumerWidget {
               const SizedBox(height: 10),
               LayoutBuilder(
                 builder: (context, constraints) {
-                  const photo = _UpcomingAction(
+                  const photo = _HomeAction(
                     icon: Icons.camera_alt_outlined,
                     title: 'Analizar comida',
                     primary: true,
                   );
-                  const manual = _UpcomingAction(
+                  final manual = _HomeAction(
                     icon: Icons.edit_note,
                     title: 'Registro manual',
+                    subtitle: 'Crear alimento',
+                    onTap: () async {
+                      final saved = await context.push<bool>('/foods/create');
+                      if (!context.mounted || saved != true) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Alimento guardado en Mis alimentos')),
+                      );
+                    },
                   );
                   if (constraints.maxWidth < 310 ||
                       MediaQuery.textScalerOf(context).scale(1) > 1.3) {
-                    return const Column(
+                    return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [photo, SizedBox(height: 12), manual],
                     );
                   }
-                  return const Row(
+                  return Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(child: photo),
@@ -140,7 +148,7 @@ class HomePage extends ConsumerWidget {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Estos accesos se habilitarán al completar el módulo de comidas.',
+                '',
                 style: TextStyle(fontSize: 12, color: AppTheme.muted),
               ),
             ],
@@ -217,48 +225,55 @@ Widget _card({required Widget child}) => Container(
   child: child,
 );
 
-class _UpcomingAction extends StatelessWidget {
+class _HomeAction extends StatelessWidget {
   final IconData icon;
   final String title;
+  final String subtitle;
   final bool primary;
-  const _UpcomingAction({
+  final VoidCallback? onTap;
+  const _HomeAction({
     required this.icon,
     required this.title,
+    this.subtitle = 'Próximamente',
     this.primary = false,
+    this.onTap,
   });
   @override
   Widget build(BuildContext context) => Semantics(
     button: true,
-    enabled: false,
-    label: '$title. Próximamente',
-    child: Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: primary ? AppTheme.green : const Color(0xFFECEEE6),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: primary ? Colors.white : AppTheme.muted),
-          const SizedBox(height: 18),
-          Text(
-            title,
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              color: primary ? Colors.white : AppTheme.ink,
-            ),
+    enabled: onTap != null,
+    child: Material(
+      color: primary ? AppTheme.green : const Color(0xFFECEEE6),
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: primary ? Colors.white : AppTheme.muted),
+              const SizedBox(height: 18),
+              Text(
+                title,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: primary ? Colors.white : AppTheme.ink,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: primary ? const Color(0xFFD5E6DD) : AppTheme.muted,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 3),
-          Text(
-            'Próximamente',
-            style: TextStyle(
-              fontSize: 12,
-              color: primary ? const Color(0xFFD5E6DD) : AppTheme.muted,
-            ),
-          ),
-        ],
+        ),
       ),
     ),
   );

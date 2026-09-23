@@ -31,7 +31,7 @@ class AccountPage extends ConsumerWidget {
               Text(auth.user?.email ?? ''),
               const SizedBox(height: 24),
               const Text(
-                'La configuración de tu perfil nutricional estará disponible en una próxima entrega.',
+                'La configuración de tu perfil nutricional estará disponible proximamente.',
               ),
               const SizedBox(height: 32),
               ListTile(
