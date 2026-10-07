@@ -5,6 +5,10 @@ import com.smartfoodai.backend.foods.entity.CustomFood;
 import com.smartfoodai.backend.foods.entity.NutritionBasis;
 import com.smartfoodai.backend.foods.repository.CustomFoodRepository;
 import com.smartfoodai.backend.meals.dto.CreateMealRequest;
+import com.smartfoodai.backend.meals.dto.MealPage;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import java.time.Duration;
 import com.smartfoodai.backend.meals.dto.MealResponse;
 import com.smartfoodai.backend.meals.dto.MealResponse.Nutrition;
 import com.smartfoodai.backend.meals.entity.*;
@@ -76,6 +80,26 @@ public class MealService {
     public MealResponse get(Long userId, Long id) {
         return response(meals.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Comida no disponible.")));
+    }
+
+    @Transactional(readOnly = true)
+    public MealPage list(Long userId, Instant start, Instant end, int page, int size) {
+        if (userId == null) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "Inicia sesión para continuar.");
+        }
+        // El fin es exclusivo. El margen de 32 días admite meses con cambios de horario.
+        if (start == null || end == null || !start.isBefore(end)
+                || Duration.between(start, end).compareTo(Duration.ofDays(32)) > 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Selecciona un periodo válido de hasta 31 días.");
+        }
+        if (page < 0 || size < 1 || size > 20 || (long) page * size > Integer.MAX_VALUE) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "La página o el tamaño no son válidos.");
+        }
+        var result = meals.findByUserIdAndConsumedAtGreaterThanEqualAndConsumedAtLessThan(
+                userId, start, end, PageRequest.of(page, size,
+                        Sort.by(Sort.Direction.DESC, "consumedAt", "id")));
+        return new MealPage(result.getContent().stream().map(this::response).toList(),
+                result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
     }
 
     private BigDecimal scale(BigDecimal value, BigDecimal factor) {

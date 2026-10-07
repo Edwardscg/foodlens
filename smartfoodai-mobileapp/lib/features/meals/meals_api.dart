@@ -63,5 +63,44 @@ class MealsApi {
     }
   });
 
+  Future<MealHistoryPage> list(DateTime start, DateTime end, int page) =>
+      auth.withAccessToken((token) async {
+        try {
+          final response = await _dio.get<dynamic>(
+            '',
+            queryParameters: {
+              'start': start.toUtc().toIso8601String(),
+              'end': end.toUtc().toIso8601String(),
+              'page': page,
+              'size': 20,
+            },
+            options: Options(headers: {'Authorization': 'Bearer $token'}),
+          );
+          return MealHistoryPage.fromJson(
+            Map<String, dynamic>.from(response.data as Map),
+          );
+        } on DioException catch (error) {
+          final status = error.response?.statusCode;
+          final data = error.response?.data;
+          throw ApiFailure(
+            status != null &&
+                    status < 500 &&
+                    data is Map &&
+                    data['message'] is String
+                ? data['message'] as String
+                : 'No pudimos cargar tu historial. Revisa la conexión e inténtalo nuevamente.',
+            status: status,
+          );
+        } on FormatException {
+          throw const ApiFailure(
+            'El historial recibido no es válido. Inténtalo nuevamente.',
+          );
+        } on TypeError {
+          throw const ApiFailure(
+            'No pudimos leer el historial. Inténtalo nuevamente.',
+          );
+        }
+      }, retryUnauthorized: true);
+
   void dispose() => _dio.close(force: true);
 }

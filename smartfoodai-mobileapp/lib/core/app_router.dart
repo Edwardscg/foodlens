@@ -12,6 +12,7 @@ import '../features/profile/profile_controller.dart';
 import '../features/profile/onboarding_page.dart';
 import '../features/profile/profile_status_page.dart';
 import '../features/meals/create_meal_page.dart';
+import '../features/meals/meal_history_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final auth = ref.read(authProvider);
@@ -36,6 +37,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
       return {
             '/home',
+            '/history',
             '/account',
             '/foods',
             '/foods/create',
@@ -70,6 +72,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/profile/edit',
         builder: (_, __) => const OnboardingPage(editing: true),
       ),
+      GoRoute(path: '/history', builder: (_, _) => const MealHistoryScreen()),
       GoRoute(path: '/home', builder: (_, __) => const HomePage()),
       GoRoute(path: '/account', builder: (_, __) => const AccountPage()),
       GoRoute(path: '/meals/create', builder: (_, _) => const CreateMealPage()),
