@@ -41,6 +41,12 @@ public class User {
 
     private String name;
 
+    @Column(name = "declared_age")
+    private Integer declaredAge;
+
+    @Column(name = "calorie_goal_source", length = 16)
+    private String calorieGoalSource;
+
     @Column(name = "birth_date")
     private LocalDate birthDate;
 
