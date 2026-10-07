@@ -133,52 +133,65 @@ class _MealHistoryScreenState extends ConsumerState<MealHistoryScreen> {
   String _dayLabel(DateTime date) =>
       DateUtils.isSameDay(date, _today) ? 'Hoy, ${_date(date)}' : _date(date);
 
-  Widget _meal(MealHistoryEntry meal) => Container(
-    margin: const EdgeInsets.only(bottom: 12),
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
+  Widget _meal(MealHistoryEntry meal) => Semantics(
+    button: true,
+    child: InkWell(
+      onTap: () => context.push('/history/${meal.id}'),
       borderRadius: BorderRadius.circular(16),
-    ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Icon(Icons.restaurant, color: AppTheme.green),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                crossAxisAlignment: WrapCrossAlignment.center,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.restaurant, color: AppTheme.green),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    meal.type.label,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        meal.type.label,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        TimeOfDay.fromDateTime(meal.consumedAt).format(context),
+                      ),
+                      Text(
+                        meal.origin == 'MANUAL' ? 'Manual' : 'Foto',
+                        style: const TextStyle(
+                          color: AppTheme.muted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
-                  Text(TimeOfDay.fromDateTime(meal.consumedAt).format(context)),
+                  const SizedBox(height: 6),
+                  Text(meal.foods.join(', ')),
+                  const SizedBox(height: 6),
                   Text(
-                    meal.origin == 'MANUAL' ? 'Manual' : 'Foto',
-                    style: const TextStyle(color: AppTheme.muted, fontSize: 12),
+                    '${foodNumber(meal.calories)} kcal',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.green,
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              Text(meal.foods.join(', ')),
-              const SizedBox(height: 6),
-              Text(
-                '${foodNumber(meal.calories)} kcal',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.green,
-                ),
-              ),
-            ],
-          ),
+            ),
+            const Icon(Icons.chevron_right, color: AppTheme.muted),
+          ],
         ),
-      ],
+      ),
     ),
   );
 

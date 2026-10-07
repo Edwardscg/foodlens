@@ -4,6 +4,7 @@ import '../../core/api_config.dart';
 import '../auth/auth_controller.dart';
 import '../auth/auth_models.dart';
 import 'meal_models.dart';
+import 'meal_detail.dart';
 
 class MealSaveFailure extends ApiFailure {
   final bool uncertain;
@@ -63,44 +64,57 @@ class MealsApi {
     }
   });
 
-  Future<MealHistoryPage> list(DateTime start, DateTime end, int page) =>
-      auth.withAccessToken((token) async {
-        try {
-          final response = await _dio.get<dynamic>(
-            '',
-            queryParameters: {
-              'start': start.toUtc().toIso8601String(),
-              'end': end.toUtc().toIso8601String(),
-              'page': page,
-              'size': 20,
-            },
-            options: Options(headers: {'Authorization': 'Bearer $token'}),
-          );
-          return MealHistoryPage.fromJson(
-            Map<String, dynamic>.from(response.data as Map),
-          );
-        } on DioException catch (error) {
-          final status = error.response?.statusCode;
-          final data = error.response?.data;
-          throw ApiFailure(
-            status != null &&
-                    status < 500 &&
-                    data is Map &&
-                    data['message'] is String
-                ? data['message'] as String
-                : 'No pudimos cargar tu historial. Revisa la conexión e inténtalo nuevamente.',
-            status: status,
-          );
-        } on FormatException {
-          throw const ApiFailure(
-            'El historial recibido no es válido. Inténtalo nuevamente.',
-          );
-        } on TypeError {
-          throw const ApiFailure(
-            'No pudimos leer el historial. Inténtalo nuevamente.',
-          );
-        }
-      }, retryUnauthorized: true);
+  Future<T> _read<T>(
+    String path,
+    T Function(Map<String, dynamic>) parse, {
+    Map<String, dynamic>? query,
+  }) => auth.withAccessToken((token) async {
+    try {
+      final response = await _dio.get<dynamic>(
+        path,
+        queryParameters: query,
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      return parse(Map<String, dynamic>.from(response.data as Map));
+    } on DioException catch (error) {
+      final status = error.response?.statusCode;
+      final data = error.response?.data;
+      throw ApiFailure(
+        status != null &&
+                status < 500 &&
+                data is Map &&
+                data['message'] is String
+            ? data['message'] as String
+            : 'No pudimos cargar las comidas. Revisa tu conexión e inténtalo nuevamente.',
+        status: status,
+      );
+    } on FormatException {
+      throw const ApiFailure(
+        'Los datos recibidos no son válidos. Inténtalo nuevamente.',
+      );
+    } on TypeError {
+      throw const ApiFailure(
+        'No pudimos leer los datos de la comida. Inténtalo nuevamente.',
+      );
+    }
+  }, retryUnauthorized: true);
+
+  Future<MealHistoryPage> list(DateTime start, DateTime end, int page) => _read(
+    '',
+    MealHistoryPage.fromJson,
+    query: {
+      'start': start.toUtc().toIso8601String(),
+      'end': end.toUtc().toIso8601String(),
+      'page': page,
+      'size': 20,
+    },
+  );
+
+  Future<MealDetail> get(int id) => _read('/$id', (json) {
+    final meal = MealDetail.fromJson(json);
+    if (meal.summary.id != id) throw const FormatException('Unexpected meal');
+    return meal;
+  });
 
   void dispose() => _dio.close(force: true);
 }

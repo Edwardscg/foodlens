@@ -1,0 +1,258 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../core/app_theme.dart';
+import '../auth/auth_controller.dart';
+import '../auth/auth_models.dart';
+import '../foods/food_models.dart';
+import '../foods/food_widgets.dart';
+import 'meal_detail.dart';
+import 'meals_api.dart';
+
+class MealDetailPage extends ConsumerStatefulWidget {
+  final int mealId;
+  const MealDetailPage({super.key, required this.mealId});
+  @override
+  ConsumerState<MealDetailPage> createState() => _MealDetailPageState();
+}
+
+class _MealDetailPageState extends ConsumerState<MealDetailPage> {
+  late final MealsApi _api;
+  MealDetail? _meal;
+  String? _error;
+  bool _loading = true, _unavailable = false;
+  int _revision = 0;
+  @override
+  void initState() {
+    super.initState();
+    _api = MealsApi(ref.read(authProvider));
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant MealDetailPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.mealId != widget.mealId) _load();
+  }
+
+  @override
+  void dispose() {
+    _revision++;
+    _api.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final revision = ++_revision;
+    setState(() {
+      _loading = true;
+      _error = null;
+      _meal = null;
+      _unavailable = false;
+    });
+    try {
+      final meal = await _api.get(widget.mealId);
+      if (mounted && revision == _revision) setState(() => _meal = meal);
+    } on ApiFailure catch (error) {
+      if (mounted && revision == _revision) {
+        setState(() {
+          _unavailable = error.status == 404;
+          _error = error.message;
+        });
+      }
+    } catch (_) {
+      if (mounted && revision == _revision) {
+        setState(() => _error = 'No pudimos cargar el detalle de la comida.');
+      }
+    } finally {
+      if (mounted && revision == _revision) setState(() => _loading = false);
+    }
+  }
+
+  void _back() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/history');
+    }
+  }
+
+  Widget _card(Widget child) => Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+    ),
+    child: child,
+  );
+
+  Widget _content(MealDetail meal) {
+    final summary = meal.summary;
+    final date = summary.consumedAt;
+    final gramsOnly = meal.items.every((item) => item.unit == 'GRAMS');
+    final weight = meal.items.fold(0.0, (sum, item) => sum + item.quantity);
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        _card(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                summary.type.label,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} · ${TimeOfDay.fromDateTime(date).format(context)}',
+              ),
+              const Text(
+                'Fecha y hora local del dispositivo',
+                style: TextStyle(fontSize: 12, color: AppTheme.muted),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Origen: ${summary.origin == 'MANUAL' ? 'Registro manual' : summary.origin}',
+              ),
+              Text(
+                'Zona del registro: ${meal.timeZone}',
+                style: const TextStyle(fontSize: 12, color: AppTheme.muted),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        _card(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('APORTE ENERGÉTICO', style: TextStyle(fontSize: 12)),
+              const SizedBox(height: 8),
+              Text(
+                '${foodNumber(meal.totals.calories)} kcal',
+                style: const TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.green,
+                ),
+              ),
+              if (gramsOnly)
+                Text('Total de la ración: ${foodNumber(weight)} g'),
+              const SizedBox(height: 20),
+              MacroSummary(
+                carbs: meal.totals.carbs,
+                protein: meal.totals.protein,
+                fat: meal.totals.fat,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'Alimentos confirmados (${meal.items.length})',
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        for (final item in meal.items)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _card(
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.restaurant, color: AppTheme.green),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.name,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '${foodNumber(item.nutrition.calories)} kcal / ${foodNumber(item.quantity)} ${item.unitLabel}',
+                          style: const TextStyle(color: AppTheme.green),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Carbohidratos: ${foodNumber(item.nutrition.carbs)} g · Proteína: ${foodNumber(item.nutrition.protein)} g · Grasas: ${foodNumber(item.nutrition.fat)} g',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        const SizedBox(height: 8),
+        const Text(
+          'Estos valores corresponden a la comida guardada. Los cambios posteriores en tus alimentos no modifican este registro.',
+          style: TextStyle(color: AppTheme.muted, fontSize: 12),
+        ),
+        const SizedBox(height: 20),
+        OutlinedButton(
+          onPressed: _back,
+          child: const Text('Volver al historial'),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('Detalle de comida'),
+      leading: IconButton(
+        tooltip: 'Volver al historial',
+        onPressed: _back,
+        icon: const Icon(Icons.arrow_back),
+      ),
+    ),
+    body: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _meal != null
+            ? _content(_meal!)
+            : Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _unavailable ? Icons.search_off : Icons.error_outline,
+                      size: 40,
+                      color: AppTheme.muted,
+                    ),
+                    const SizedBox(height: 16),
+                    Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        _unavailable
+                            ? 'Esta comida no está disponible.'
+                            : _error ?? 'No pudimos cargar la comida.',
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    if (!_unavailable)
+                      FilledButton(
+                        onPressed: _load,
+                        child: const Text('Reintentar'),
+                      ),
+                    TextButton(
+                      onPressed: _back,
+                      child: const Text('Volver al historial'),
+                    ),
+                  ],
+                ),
+              ),
+      ),
+    ),
+  );
+}
