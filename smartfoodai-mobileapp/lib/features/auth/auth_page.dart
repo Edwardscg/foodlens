@@ -19,11 +19,13 @@ class _AuthPageState extends ConsumerState<AuthPage> {
   final _form = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _confirmPassword = TextEditingController();
   bool _obscure = true;
   @override
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _confirmPassword.dispose();
     super.dispose();
   }
 
@@ -38,6 +40,7 @@ class _AuthPageState extends ConsumerState<AuthPage> {
     if (ref.read(authProvider).status == AuthStatus.signedIn) {
       TextInput.finishAutofillContext();
       _password.clear();
+      _confirmPassword.clear();
     }
   }
 
@@ -65,9 +68,9 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                             onPressed: auth.busy
                                 ? null
                                 : () {
-                              auth.clearErrors();
-                              context.go('/login');
-                            },
+                                    auth.clearErrors();
+                                    context.go('/login');
+                                  },
                             padding: EdgeInsets.zero,
                             alignment: Alignment.centerLeft,
                             tooltip: 'Volver a iniciar sesión',
@@ -111,8 +114,9 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                           ),
                           validator: (value) {
                             final email = value?.trim() ?? '';
-                            if (email.isEmpty)
+                            if (email.isEmpty) {
                               return 'Ingresa tu correo electrónico';
+                            }
                             if (email.length > 254 ||
                                 !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
                                     .hasMatch(email)) {
@@ -138,9 +142,11 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                                 ? AutofillHints.newPassword
                                 : AutofillHints.password,
                           ],
-                          textInputAction: TextInputAction.done,
+                          textInputAction: register
+                              ? TextInputAction.next
+                              : TextInputAction.done,
                           onFieldSubmitted: (_) {
-                            if (!auth.busy) _submit();
+                            if (!register && !auth.busy) _submit();
                           },
                           decoration: InputDecoration(
                             hintText: register
@@ -165,15 +171,51 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                           ),
                           validator: (value) {
                             final password = value ?? '';
-                            if (password.trim().isEmpty)
+                            if (password.trim().isEmpty) {
                               return 'Ingresa tu contraseña';
-                            if (register && password.runes.length < 8)
+                            }
+                            if (register && password.runes.length < 8) {
                               return 'Usa al menos 8 caracteres';
-                            if (utf8.encode(password).length > 72)
+                            }
+                            if (utf8.encode(password).length > 72) {
                               return 'La contraseña es demasiado larga';
+                            }
                             return null;
                           },
                         ),
+                        if (register) ...[
+                          const SizedBox(height: 22),
+                          const Text(
+                            'Confirmar contraseña',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _confirmPassword,
+                            enabled: !auth.busy,
+                            obscureText: _obscure,
+                            autocorrect: false,
+                            enableSuggestions: false,
+                            autofillHints: const [AutofillHints.newPassword],
+                            textInputAction: TextInputAction.done,
+                            onFieldSubmitted: (_) {
+                              if (!auth.busy) _submit();
+                            },
+                            decoration: const InputDecoration(
+                              hintText: 'Repite tu contraseña',
+                              errorMaxLines: 3,
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Confirma tu contraseña';
+                              }
+                              if (value != _password.text) {
+                                return 'Las contraseñas no coinciden';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
                         if (register) ...[
                           const SizedBox(height: 10),
                           const Row(
@@ -202,16 +244,16 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                           onPressed: auth.busy ? null : _submit,
                           child: auth.busy
                               ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
                               : Text(
-                            register ? 'Crear cuenta' : 'Iniciar sesión',
-                          ),
+                                  register ? 'Crear cuenta' : 'Iniciar sesión',
+                                ),
                         ),
                         if (!register)
                           Center(
@@ -219,9 +261,9 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                               onPressed: auth.busy
                                   ? null
                                   : () {
-                                auth.clearErrors();
-                                context.push('/register');
-                              },
+                                      auth.clearErrors();
+                                      context.push('/register');
+                                    },
                               child: const Text(
                                 '¿No tienes cuenta? Crear cuenta',
                               ),

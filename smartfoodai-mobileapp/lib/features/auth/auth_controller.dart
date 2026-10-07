@@ -90,8 +90,9 @@ class AuthController extends ChangeNotifier {
 
   Future<void> _rotateOnce() async {
     final previous = _session;
-    if (previous == null)
+    if (previous == null) {
       throw const ApiFailure('Inicia sesión nuevamente.', status: 401);
+    }
     final next = await _api.refresh(previous.refreshToken);
     if (!identical(_session, previous) || _disposed) {
       throw const ApiFailure('La sesión cambió.', status: 401);
@@ -105,9 +106,9 @@ class AuthController extends ChangeNotifier {
 
   // Renew access before a request. Only reads may retry after a rejected token.
   Future<T> withAccessToken<T>(
-      Future<T> Function(String token) operation, {
-        bool retryUnauthorized = false,
-      }) async {
+    Future<T> Function(String token) operation, {
+    bool retryUnauthorized = false,
+  }) async {
     final owner = user?.id;
     void checkSession() {
       if (_disposed ||
@@ -167,10 +168,10 @@ class AuthController extends ChangeNotifier {
   }
 
   Future<void> submit(
-      String email,
-      String password, {
-        required bool register,
-      }) async {
+    String email,
+    String password, {
+    required bool register,
+  }) async {
     if (busy) return;
     busy = true;
     message = null;
@@ -182,7 +183,9 @@ class AuthController extends ChangeNotifier {
       await _store.save(_session!);
       user = await _identity();
       status = AuthStatus.signedIn;
-      if (register) notice = 'Cuenta creada. La configuración de perfil estará disponible en la siguiente entrega.';
+      if (register) {
+        notice = 'Cuenta creada. Completa tu perfil para continuar.';
+      }
     } on ApiFailure catch (error) {
       message = error.message;
       fieldErrors = error.fields;
@@ -230,7 +233,7 @@ class AuthController extends ChangeNotifier {
         }
       }
     } catch (_) {
-      // The encrypted queue remains available for the next attempt.
+      // La cola cifrada conserva los cierres pendientes para el siguiente intento.
     } finally {
       _flushing = false;
     }
