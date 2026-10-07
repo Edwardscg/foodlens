@@ -7,4 +7,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface CustomFoodRepository extends JpaRepository<CustomFood, Long> {
     Page<CustomFood> findByUserId(Long userId, Pageable pageable);
+    java.util.Optional<CustomFood> findByIdAndUserId(Long id, Long userId);
 }
