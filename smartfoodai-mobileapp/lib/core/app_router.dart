@@ -8,12 +8,16 @@ import '../features/auth/account_page.dart';
 import '../features/home/home_page.dart';
 import '../features/foods/my_foods_page.dart';
 import '../features/foods/create_food_page.dart';
+import '../features/profile/profile_controller.dart';
+import '../features/profile/onboarding_page.dart';
+import '../features/profile/profile_status_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final auth = ref.read(authProvider);
+  final profile = ref.read(profileProvider);
   final router = GoRouter(
     initialLocation: '/loading',
-    refreshListenable: auth,
+    refreshListenable: Listenable.merge([auth, profile]),
     redirect: (context, state) {
       final path = state.uri.path;
       if (auth.status == AuthStatus.restoring)
@@ -23,7 +27,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (auth.status == AuthStatus.signedOut) {
         return path == '/login' || path == '/register' ? null : '/login';
       }
-      return {'/home', '/account', '/foods', '/foods/create'}.contains(path)
+      if (profile.profile == null) {
+        return path == '/profile-loading' ? null : '/profile-loading';
+      }
+      if (!profile.profile!.completed) {
+        return path == '/onboarding' ? null : '/onboarding';
+      }
+      return {
+            '/home',
+            '/account',
+            '/foods',
+            '/foods/create',
+            '/profile/edit',
+          }.contains(path)
           ? null
           : '/home';
     },
@@ -31,7 +47,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/loading',
         builder: (_, __) =>
-        const Scaffold(body: Center(child: CircularProgressIndicator())),
+            const Scaffold(body: Center(child: CircularProgressIndicator())),
       ),
       GoRoute(path: '/connection', builder: (_, __) => const _ConnectionPage()),
       GoRoute(
@@ -41,7 +57,16 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/register',
         builder: (_, __) =>
-        const AuthPage(key: ValueKey('register'), register: true),
+            const AuthPage(key: ValueKey('register'), register: true),
+      ),
+      GoRoute(
+        path: '/profile-loading',
+        builder: (_, __) => const ProfileStatusPage(),
+      ),
+      GoRoute(path: '/onboarding', builder: (_, __) => const OnboardingPage()),
+      GoRoute(
+        path: '/profile/edit',
+        builder: (_, __) => const OnboardingPage(editing: true),
       ),
       GoRoute(path: '/home', builder: (_, __) => const HomePage()),
       GoRoute(path: '/account', builder: (_, __) => const AccountPage()),

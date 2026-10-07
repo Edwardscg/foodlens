@@ -134,7 +134,7 @@ class AuthController extends ChangeNotifier {
         checkSession();
         if (!retryUnauthorized) {
           throw const ApiFailure(
-            'Tu sesión se renovó. Vuelve a guardar el alimento.',
+            'Tu sesión se renovó. Vuelve a intentar guardar.',
           );
         }
         result = await operation(_session!.accessToken);

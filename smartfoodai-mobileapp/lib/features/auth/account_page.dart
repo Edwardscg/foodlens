@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'auth_controller.dart';
+import '../profile/profile_controller.dart';
 
 class AccountPage extends ConsumerWidget {
   const AccountPage({super.key});
@@ -30,8 +31,14 @@ class AccountPage extends ConsumerWidget {
               const SizedBox(height: 8),
               Text(auth.user?.email ?? ''),
               const SizedBox(height: 24),
-              const Text(
-                'La configuración de tu perfil nutricional estará disponible proximamente.',
+              ListTile(
+                leading: const Icon(Icons.tune),
+                title: const Text('Mi perfil nutricional'),
+                subtitle: Text(
+                  '${ref.watch(profileProvider).profile?.dailyCalorieGoal ?? '—'} kcal al día',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: auth.busy ? null : () => context.push('/profile/edit'),
               ),
               const SizedBox(height: 32),
               ListTile(
@@ -52,27 +59,27 @@ class AccountPage extends ConsumerWidget {
                 onPressed: auth.busy
                     ? null
                     : () async {
-                  final confirmed = await showDialog<bool>(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('¿Cerrar sesión?'),
-                      content: const Text(
-                        'Podrás volver a entrar con tu correo y contraseña.',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancelar'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          child: const Text('Cerrar sesión'),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (confirmed == true) await auth.logout();
-                },
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('¿Cerrar sesión?'),
+                            content: const Text(
+                              'Podrás volver a entrar con tu correo y contraseña.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text('Cancelar'),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                child: const Text('Cerrar sesión'),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirmed == true) await auth.logout();
+                      },
                 child: Text(auth.busy ? 'Cerrando sesión…' : 'Cerrar sesión'),
               ),
             ],

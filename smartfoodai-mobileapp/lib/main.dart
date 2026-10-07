@@ -36,8 +36,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final auth = ref.read(authProvider);
     if (state == AppLifecycleState.resumed &&
-        (auth.status == AuthStatus.signedIn ||
-            auth.status == AuthStatus.offline)) {
+        auth.status == AuthStatus.offline) {
       unawaited(auth.restore());
     }
   }
