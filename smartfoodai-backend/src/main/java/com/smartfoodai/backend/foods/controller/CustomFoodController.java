@@ -24,7 +24,8 @@ public class CustomFoodController {
     @GetMapping
     public CustomFoodPage list(@AuthenticationPrincipal Long userId,
                                @RequestParam(name = "page", defaultValue = "0") int page,
-                               @RequestParam(name = "size", defaultValue = "20") int size) {
-        return foods.list(userId, page, size);
+                               @RequestParam(name = "size", defaultValue = "20") int size,
+                               @RequestParam(name = "q", defaultValue = "") String query) {
+        return foods.list(userId, page, size, query);
     }
 }

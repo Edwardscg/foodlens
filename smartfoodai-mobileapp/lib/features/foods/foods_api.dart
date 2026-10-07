@@ -67,11 +67,11 @@ class FoodsApi {
     }
   }
 
-  Future<FoodPage> list(int page) => auth.withAccessToken(
+  Future<FoodPage> list(int page, {String query = ''}) => auth.withAccessToken(
         (token) => _call(() async {
       final response = await _dio.get<dynamic>(
         '',
-        queryParameters: {'page': page, 'size': 20},
+        queryParameters: {'page': page, 'size': 20, 'q': query},
         options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
       return FoodPage.fromJson(Map<String, dynamic>.from(response.data as Map));

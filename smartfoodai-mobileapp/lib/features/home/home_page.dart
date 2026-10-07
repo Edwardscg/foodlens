@@ -120,12 +120,12 @@ class HomePage extends ConsumerWidget {
                   final manual = _HomeAction(
                     icon: Icons.edit_note,
                     title: 'Registro manual',
-                    subtitle: 'Crear alimento',
+                    subtitle: 'Registrar comida',
                     onTap: () async {
-                      final saved = await context.push<bool>('/foods/create');
+                      final saved = await context.push<bool>('/meals/create');
                       if (!context.mounted || saved != true) return;
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Alimento guardado en Mis alimentos')),
+                        const SnackBar(content: Text('Comida registrada correctamente')),
                       );
                     },
                   );

@@ -31,14 +31,19 @@ public class CustomFoodService {
     }
 
     @Transactional(readOnly = true)
-    public CustomFoodPage list(Long userId, int page, int size) {
+    public CustomFoodPage list(Long userId, int page, int size, String query) {
         requireUser(userId);
         if (page < 0 || size < 1 || size > 50 || (long) page * size > Integer.MAX_VALUE) {
             throw new ApiException(HttpStatus.BAD_REQUEST,
                     "La página debe ser 0 o mayor y el tamaño debe estar entre 1 y 50");
         }
-        var result = foods.findByUserId(userId, PageRequest.of(page, size,
-                Sort.by(Sort.Direction.DESC, "createdAt", "id")));
+        String search = query == null ? "" : query.strip();
+        if (search.length() > 120) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "La búsqueda no debe superar 120 caracteres");
+        }
+        var paging = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt", "id"));
+        var result = search.isEmpty() ? foods.findByUserId(userId, paging)
+                : foods.findByUserIdAndNameContainingIgnoreCase(userId, search, paging);
         return new CustomFoodPage(result.getContent().stream().map(this::response).toList(),
                 result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
     }

@@ -7,5 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface CustomFoodRepository extends JpaRepository<CustomFood, Long> {
     Page<CustomFood> findByUserId(Long userId, Pageable pageable);
+    Page<CustomFood> findByUserIdAndNameContainingIgnoreCase(Long userId, String name, Pageable pageable);
     java.util.Optional<CustomFood> findByIdAndUserId(Long id, Long userId);
 }
