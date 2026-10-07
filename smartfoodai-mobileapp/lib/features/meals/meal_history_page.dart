@@ -133,10 +133,15 @@ class _MealHistoryScreenState extends ConsumerState<MealHistoryScreen> {
   String _dayLabel(DateTime date) =>
       DateUtils.isSameDay(date, _today) ? 'Hoy, ${_date(date)}' : _date(date);
 
+  Future<void> _openMeal(int id) async {
+    await context.push<void>('/history/$id');
+    if (mounted) await _load(reset: true);
+  }
+
   Widget _meal(MealHistoryEntry meal) => Semantics(
     button: true,
     child: InkWell(
-      onTap: () => context.push('/history/${meal.id}'),
+      onTap: () => _openMeal(meal.id),
       borderRadius: BorderRadius.circular(16),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),

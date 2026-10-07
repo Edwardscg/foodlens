@@ -116,5 +116,33 @@ class MealsApi {
     return meal;
   });
 
+  Future<bool> delete(int id) => auth.withAccessToken((token) async {
+    try {
+      final response = await _dio.delete<void>(
+        '/$id',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      if (response.statusCode != 204) {
+        throw const ApiFailure(
+          'No pudimos confirmar la eliminación. Comprueba el estado de la comida.',
+        );
+      }
+      return true;
+    } on DioException catch (error) {
+      final status = error.response?.statusCode;
+      if (status == 404) return false;
+      final data = error.response?.data;
+      throw ApiFailure(
+        status != null &&
+                status < 500 &&
+                data is Map &&
+                data['message'] is String
+            ? data['message'] as String
+            : 'No pudimos confirmar la eliminación. Comprueba el estado de la comida antes de intentarlo nuevamente.',
+        status: status,
+      );
+    }
+  });
+
   void dispose() => _dio.close(force: true);
 }

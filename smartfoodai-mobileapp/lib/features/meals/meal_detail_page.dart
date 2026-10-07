@@ -23,6 +23,8 @@ class _MealDetailPageState extends ConsumerState<MealDetailPage> {
   String? _error;
   bool _loading = true, _unavailable = false;
   int _revision = 0;
+  bool _deleting = false, _confirmingDelete = false;
+  String? _deleteError;
   @override
   void initState() {
     super.initState();
@@ -47,6 +49,7 @@ class _MealDetailPageState extends ConsumerState<MealDetailPage> {
     final revision = ++_revision;
     setState(() {
       _loading = true;
+      _deleteError = null;
       _error = null;
       _meal = null;
       _unavailable = false;
@@ -70,7 +73,69 @@ class _MealDetailPageState extends ConsumerState<MealDetailPage> {
     }
   }
 
+  Future<void> _delete() async {
+    if (_deleting || _confirmingDelete || _meal == null) return;
+    final meal = _meal!;
+    final revision = _revision;
+    _confirmingDelete = true;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const Icon(Icons.delete_outline, color: Colors.red),
+        title: const Text('¿Eliminar esta comida?'),
+        content: Text(
+          '${meal.summary.type.label} · ${foodNumber(meal.totals.calories)} kcal.\nSe quitará del historial. Esta acción no se puede deshacer. Tus alimentos personalizados se conservarán.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Eliminar comida'),
+          ),
+        ],
+      ),
+    );
+    _confirmingDelete = false;
+    if (!mounted || confirmed != true || revision != _revision) return;
+    setState(() {
+      _deleting = true;
+      _deleteError = null;
+    });
+    try {
+      final deleted = await _api.delete(meal.summary.id);
+      if (!mounted || revision != _revision) return;
+      setState(() => _deleting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            deleted ? 'Comida eliminada.' : 'La comida ya no está disponible.',
+          ),
+        ),
+      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _back();
+      });
+    } on ApiFailure catch (error) {
+      if (mounted && revision == _revision) {
+        setState(() => _deleteError = error.message);
+      }
+    } catch (_) {
+      if (mounted && revision == _revision) {
+        setState(
+          () => _deleteError = 'No pudimos confirmar la eliminación. Comprueba el estado de la comida.',
+        );
+      }
+    } finally {
+      if (mounted && revision == _revision) setState(() => _deleting = false);
+    }
+  }
+
   void _back() {
+    if (_deleting) return;
     if (context.canPop()) {
       context.pop();
     } else {
@@ -194,8 +259,38 @@ class _MealDetailPageState extends ConsumerState<MealDetailPage> {
           style: TextStyle(color: AppTheme.muted, fontSize: 12),
         ),
         const SizedBox(height: 20),
+        if (_deleteError != null) ...[
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              _deleteError!,
+              style: const TextStyle(color: Color(0xFF8B251C)),
+            ),
+          ),
+          TextButton(
+            onPressed: _deleting ? null : _load,
+            child: const Text('Comprobar estado de la comida'),
+          ),
+          const SizedBox(height: 12),
+        ],
+        FilledButton.icon(
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFFFADBD8),
+            foregroundColor: const Color(0xFFB42318),
+          ),
+          onPressed: _deleting ? null : _delete,
+          icon: _deleting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.delete_outline),
+          label: Text(_deleting ? 'Eliminando…' : 'Eliminar comida'),
+        ),
+        const SizedBox(height: 12),
         OutlinedButton(
-          onPressed: _back,
+          onPressed: _deleting ? null : _back,
           child: const Text('Volver al historial'),
         ),
       ],
@@ -203,55 +298,58 @@ class _MealDetailPageState extends ConsumerState<MealDetailPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('Detalle de comida'),
-      leading: IconButton(
-        tooltip: 'Volver al historial',
-        onPressed: _back,
-        icon: const Icon(Icons.arrow_back),
+  Widget build(BuildContext context) => PopScope(
+    canPop: !_deleting,
+    child: Scaffold(
+      appBar: AppBar(
+        title: const Text('Detalle de comida'),
+        leading: IconButton(
+          tooltip: 'Volver al historial',
+          onPressed: _deleting ? null : _back,
+          icon: const Icon(Icons.arrow_back),
+        ),
       ),
-    ),
-    body: Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _meal != null
-            ? _content(_meal!)
-            : Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      _unavailable ? Icons.search_off : Icons.error_outline,
-                      size: 40,
-                      color: AppTheme.muted,
-                    ),
-                    const SizedBox(height: 16),
-                    Semantics(
-                      liveRegion: true,
-                      child: Text(
-                        _unavailable
-                            ? 'Esta comida no está disponible.'
-                            : _error ?? 'No pudimos cargar la comida.',
-                        textAlign: TextAlign.center,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _meal != null
+              ? _content(_meal!)
+              : Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _unavailable ? Icons.search_off : Icons.error_outline,
+                        size: 40,
+                        color: AppTheme.muted,
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    if (!_unavailable)
-                      FilledButton(
-                        onPressed: _load,
-                        child: const Text('Reintentar'),
+                      const SizedBox(height: 16),
+                      Semantics(
+                        liveRegion: true,
+                        child: Text(
+                          _unavailable
+                              ? 'Esta comida no está disponible.'
+                              : _error ?? 'No pudimos cargar la comida.',
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                    TextButton(
-                      onPressed: _back,
-                      child: const Text('Volver al historial'),
-                    ),
-                  ],
+                      const SizedBox(height: 20),
+                      if (!_unavailable)
+                        FilledButton(
+                          onPressed: _load,
+                          child: const Text('Reintentar'),
+                        ),
+                      TextButton(
+                        onPressed: _back,
+                        child: const Text('Volver al historial'),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+        ),
       ),
     ),
   );

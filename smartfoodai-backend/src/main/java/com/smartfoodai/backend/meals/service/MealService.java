@@ -102,6 +102,17 @@ public class MealService {
                 result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
     }
 
+    @Transactional
+    public void delete(Long userId, Long id) {
+        if (userId == null) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "Inicia sesión para continuar.");
+        }
+        Meal meal = meals.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Comida no disponible."));
+        // Cascade elimina únicamente los elementos guardados de esta comida.
+        meals.delete(meal);
+    }
+
     private BigDecimal scale(BigDecimal value, BigDecimal factor) {
         return value.multiply(factor).setScale(2, RoundingMode.HALF_UP);
     }

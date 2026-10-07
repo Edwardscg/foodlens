@@ -34,4 +34,9 @@ public class MealController {
     public MealResponse get(@AuthenticationPrincipal Long userId, @PathVariable Long id) {
         return service.get(userId, id);
     }
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@AuthenticationPrincipal Long userId, @PathVariable Long id) {
+        service.delete(userId, id);
+        return ResponseEntity.noContent().build();
+    }
 }
