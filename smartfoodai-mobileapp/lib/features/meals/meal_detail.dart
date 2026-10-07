@@ -22,13 +22,23 @@ class MealNutrition {
 }
 
 class SavedMealItem {
+  final int id;
   final String name, unit;
   final double quantity;
   final MealNutrition nutrition;
-  const SavedMealItem(this.name, this.unit, this.quantity, this.nutrition);
+  const SavedMealItem(
+    this.id,
+    this.name,
+    this.unit,
+    this.quantity,
+    this.nutrition,
+  );
   factory SavedMealItem.fromJson(Map<String, dynamic> json) {
+    final id = json['id'];
     final name = json['name'], unit = json['unit'], quantity = json['quantity'];
-    if (name is! String ||
+    if (id is! int ||
+        id <= 0 ||
+        name is! String ||
         name.trim().isEmpty ||
         (unit != 'GRAMS' && unit != 'SERVINGS') ||
         quantity is! num ||
@@ -37,6 +47,7 @@ class SavedMealItem {
       throw const FormatException('Invalid saved item');
     }
     return SavedMealItem(
+      id,
       name,
       unit as String,
       quantity.toDouble(),
@@ -49,19 +60,33 @@ class SavedMealItem {
 }
 
 class MealDetail {
+  final int version;
   final MealHistoryEntry summary;
   final String timeZone;
   final MealNutrition totals;
   final List<SavedMealItem> items;
-  const MealDetail(this.summary, this.timeZone, this.totals, this.items);
+  const MealDetail(
+    this.version,
+    this.summary,
+    this.timeZone,
+    this.totals,
+    this.items,
+  );
   factory MealDetail.fromJson(Map<String, dynamic> json) {
     final summary = MealHistoryEntry.fromJson(json);
+    final version = json['version'];
     final zone = json['timeZone'];
     final raw = json['items'];
-    if (zone is! String || zone.isEmpty || raw is! List || raw.isEmpty) {
+    if (version is! int ||
+        version < 0 ||
+        zone is! String ||
+        zone.isEmpty ||
+        raw is! List ||
+        raw.isEmpty) {
       throw const FormatException('Invalid saved meal');
     }
     return MealDetail(
+      version,
       summary,
       zone,
       MealNutrition.fromJson(Map<String, dynamic>.from(json['totals'] as Map)),

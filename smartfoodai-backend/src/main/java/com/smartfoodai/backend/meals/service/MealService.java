@@ -6,6 +6,8 @@ import com.smartfoodai.backend.foods.entity.NutritionBasis;
 import com.smartfoodai.backend.foods.repository.CustomFoodRepository;
 import com.smartfoodai.backend.meals.dto.CreateMealRequest;
 import com.smartfoodai.backend.meals.dto.MealPage;
+import com.smartfoodai.backend.meals.dto.UpdateMealRequest;
+import java.util.HashMap;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import java.time.Duration;
@@ -113,13 +115,46 @@ public class MealService {
         meals.delete(meal);
     }
 
+    @Transactional
+    public MealResponse update(Long userId, Long id, UpdateMealRequest request) {
+        if (userId == null) throw new ApiException(HttpStatus.UNAUTHORIZED, "Inicia sesión para continuar.");
+        Meal meal = meals.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Comida no disponible."));
+        if (meal.getVersion() != request.version()) {
+            throw new ApiException(HttpStatus.CONFLICT, "La comida cambió. Recarga el detalle antes de editarla nuevamente.");
+        }
+        var quantities = new HashMap<Long, BigDecimal>();
+        for (var item : request.items()) {
+            if (quantities.put(item.id(), item.quantity()) != null) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "No repitas alimentos del registro.");
+            }
+        }
+        if (quantities.size() != meal.getItems().size()
+                || meal.getItems().stream().anyMatch(item -> !quantities.containsKey(item.getId()))) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Esta edición debe conservar los alimentos del registro.");
+        }
+        meal.setMealType(request.mealType());
+        for (MealItem item : meal.getItems()) {
+            item.setQuantity(quantities.get(item.getId()));
+            BigDecimal factor = item.getUnit() == MealUnit.GRAMS
+                    ? item.getQuantity().movePointLeft(2) : item.getQuantity();
+            item.setCalories(scale(item.getBaseCalories(), factor));
+            item.setProteinG(scale(item.getBaseProteinG(), factor));
+            item.setCarbsG(scale(item.getBaseCarbsG(), factor));
+            item.setFatG(scale(item.getBaseFatG(), factor));
+        }
+        // Los cambios en hijos también deben incrementar la versión de la comida.
+        meal.setUpdatedAt(Instant.now());
+        return response(meals.saveAndFlush(meal));
+    }
+
     private BigDecimal scale(BigDecimal value, BigDecimal factor) {
         return value.multiply(factor).setScale(2, RoundingMode.HALF_UP);
     }
 
     private MealResponse response(Meal meal) {
         List<MealResponse.Item> items = meal.getItems().stream().map(item -> new MealResponse.Item(
-                item.getFoodId(), item.getName(), item.getBasis(), item.getQuantity(), item.getUnit(),
+                item.getId(), item.getFoodId(), item.getName(), item.getBasis(), item.getQuantity(), item.getUnit(),
                 new Nutrition(item.getBaseCalories(), item.getBaseProteinG(), item.getBaseCarbsG(), item.getBaseFatG()),
                 new Nutrition(item.getCalories(), item.getProteinG(), item.getCarbsG(), item.getFatG()))).toList();
         BigDecimal calories = BigDecimal.ZERO, protein = BigDecimal.ZERO,
@@ -132,6 +167,6 @@ public class MealService {
         }
         return new MealResponse(meal.getId(), meal.getMealType(), meal.getConsumedAt(),
                 meal.getTimeZone(), meal.getOrigin(), meal.getCreatedAt(), items,
-                new Nutrition(calories, protein, carbs, fat));
+                new Nutrition(calories, protein, carbs, fat), meal.getVersion());
     }
 }

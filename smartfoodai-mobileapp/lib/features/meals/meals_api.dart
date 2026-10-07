@@ -116,6 +116,38 @@ class MealsApi {
     return meal;
   });
 
+  Future<void> update(
+    MealDetail meal,
+    MealType type,
+    Map<int, double> quantities,
+  ) => auth.withAccessToken((token) async {
+    try {
+      await _dio.put<dynamic>(
+        '/${meal.summary.id}',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+        data: {
+          'version': meal.version,
+          'mealType': type.apiValue,
+          'items': quantities.entries
+              .map((entry) => {'id': entry.key, 'quantity': entry.value})
+              .toList(),
+        },
+      );
+    } on DioException catch (error) {
+      final status = error.response?.statusCode;
+      final data = error.response?.data;
+      throw ApiFailure(
+        status != null &&
+                status < 500 &&
+                data is Map &&
+                data['message'] is String
+            ? data['message'] as String
+            : 'No pudimos confirmar los cambios. Vuelve al detalle para comprobar el registro antes de editar nuevamente.',
+        status: status,
+      );
+    }
+  });
+
   Future<bool> delete(int id) => auth.withAccessToken((token) async {
     try {
       final response = await _dio.delete<void>(

@@ -16,6 +16,9 @@ import java.util.List;
 public class Meal {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    @Version
+    @Column(nullable = false)
+    private long version;
     @Column(name = "user_id", nullable = false, updatable = false)
     private Long userId;
     @Enumerated(EnumType.STRING) @JdbcTypeCode(SqlTypes.VARCHAR)
@@ -29,9 +32,11 @@ public class Meal {
     private String origin = "MANUAL";
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+    @Column(name = "updated_at")
+    private Instant updatedAt;
     @OneToMany(mappedBy = "meal", cascade = CascadeType.ALL)
     @OrderBy("id ASC")
     private List<MealItem> items = new ArrayList<>();
     @PrePersist
-    void onCreate() { createdAt = Instant.now(); }
+    void onCreate() { createdAt = Instant.now(); updatedAt = createdAt; }
 }

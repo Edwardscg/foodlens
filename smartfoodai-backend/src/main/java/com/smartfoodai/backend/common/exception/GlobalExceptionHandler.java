@@ -40,6 +40,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 .body(new ErrorResponse("Los datos entran en conflicto con un registro existente", Map.of()));
     }
 
+    @ExceptionHandler(org.springframework.orm.ObjectOptimisticLockingFailureException.class)
+    ResponseEntity<ErrorResponse> changed(org.springframework.orm.ObjectOptimisticLockingFailureException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("La comida cambió. Recarga el detalle antes de editarla nuevamente.", Map.of()));
+    }
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<ErrorResponse> unexpected(Exception exception) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 import java.time.Instant;
 import com.smartfoodai.backend.meals.dto.MealPage;
+import com.smartfoodai.backend.meals.dto.UpdateMealRequest;
 
 @RestController
 @RequestMapping("/api/meals")
@@ -38,5 +39,10 @@ public class MealController {
     public ResponseEntity<Void> delete(@AuthenticationPrincipal Long userId, @PathVariable Long id) {
         service.delete(userId, id);
         return ResponseEntity.noContent().build();
+    }
+    @PutMapping("/{id}")
+    public MealResponse update(@AuthenticationPrincipal Long userId, @PathVariable Long id,
+                               @Valid @RequestBody UpdateMealRequest request) {
+        return service.update(userId, id, request);
     }
 }

@@ -73,6 +73,12 @@ class _MealDetailPageState extends ConsumerState<MealDetailPage> {
     }
   }
 
+  Future<void> _edit() async {
+    if (_deleting || _confirmingDelete) return;
+    await context.push<void>('/history/${widget.mealId}/edit');
+    if (mounted) await _load();
+  }
+
   Future<void> _delete() async {
     if (_deleting || _confirmingDelete || _meal == null) return;
     final meal = _meal!;
@@ -273,6 +279,12 @@ class _MealDetailPageState extends ConsumerState<MealDetailPage> {
           ),
           const SizedBox(height: 12),
         ],
+        FilledButton.icon(
+          onPressed: _deleting ? null : _edit,
+          icon: const Icon(Icons.edit_outlined),
+          label: const Text('Editar comida y cantidades'),
+        ),
+        const SizedBox(height: 12),
         FilledButton.icon(
           style: FilledButton.styleFrom(
             backgroundColor: const Color(0xFFFADBD8),

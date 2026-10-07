@@ -14,6 +14,7 @@ import '../features/profile/profile_status_page.dart';
 import '../features/meals/create_meal_page.dart';
 import '../features/meals/meal_history_page.dart';
 import '../features/meals/meal_detail_page.dart';
+import '../features/meals/edit_meal_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final auth = ref.read(authProvider);
@@ -36,8 +37,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (!profile.profile!.completed) {
         return path == '/onboarding' ? null : '/onboarding';
       }
-      if (RegExp(r'^/history/[1-9][0-9]*$').hasMatch(path) &&
-          int.tryParse(path.split('/').last) != null) {
+      if (RegExp(r'^/history/[1-9][0-9]*(/edit)?$').hasMatch(path) &&
+          int.tryParse(path.split('/')[2]) != null) {
         return null;
       }
       return {
@@ -80,7 +81,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/history', builder: (_, _) => const MealHistoryScreen(), routes: [
         GoRoute(path: ':mealId', builder: (_, state) => MealDetailPage(
           mealId: int.parse(state.pathParameters['mealId']!),
-        )),
+        ), routes: [
+          GoRoute(path: 'edit', builder: (_, state) => EditMealPage(
+            key: ValueKey(state.pathParameters['mealId']),
+            mealId: int.parse(state.pathParameters['mealId']!),
+          )),
+        ]),
       ]),
       GoRoute(path: '/home', builder: (_, __) => const HomePage()),
       GoRoute(path: '/account', builder: (_, __) => const AccountPage()),

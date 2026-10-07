@@ -9,10 +9,10 @@ import java.util.List;
 
 public record MealResponse(Long id, MealType mealType, Instant consumedAt,
         String timeZone, String origin, Instant createdAt, List<Item> items,
-        Nutrition totals) {
+        Nutrition totals, long version) {
     public record Nutrition(BigDecimal calories, BigDecimal proteinG,
                             BigDecimal carbsG, BigDecimal fatG) {}
-    public record Item(Long foodId, String name, NutritionBasis basis,
+    public record Item(Long id, Long foodId, String name, NutritionBasis basis,
                        BigDecimal quantity, MealUnit unit, Nutrition baseNutrition,
                        Nutrition consumedNutrition) {}
 }
