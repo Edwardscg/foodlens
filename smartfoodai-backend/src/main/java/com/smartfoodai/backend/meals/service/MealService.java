@@ -33,46 +33,14 @@ public class MealService {
 
     @Transactional
     public MealResponse create(Long userId, CreateMealRequest request) {
-        if (!ZoneId.getAvailableZoneIds().contains(request.timeZone())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Selecciona una zona horaria IANA válida.");
-        }
-        if (request.consumedAt().isBefore(Instant.parse("1000-01-01T00:00:00Z"))) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "La fecha de consumo está fuera del rango admitido.");
-        }
-        if (request.consumedAt().isAfter(Instant.now())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "La fecha de consumo no puede estar en el futuro.");
-        }
+        validateDate(request.consumedAt(), request.timeZone());
         Meal meal = new Meal();
         meal.setUserId(userId);
         meal.setMealType(request.mealType());
         meal.setConsumedAt(request.consumedAt());
         meal.setTimeZone(request.timeZone());
         for (CreateMealRequest.Item input : request.items()) {
-            CustomFood food = foods.findByIdAndUserId(input.foodId(), userId)
-                    .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Alimento no disponible."));
-            MealUnit expected = food.getBasis() == NutritionBasis.PER_100_G
-                    ? MealUnit.GRAMS : MealUnit.SERVINGS;
-            if (input.unit() != expected) {
-                throw new ApiException(HttpStatus.BAD_REQUEST,
-                        "La unidad debe coincidir con la base nutricional del alimento: " + expected);
-            }
-            MealItem item = new MealItem();
-            item.setMeal(meal);
-            item.setFoodId(food.getId());
-            item.setName(food.getName());
-            item.setBasis(food.getBasis());
-            item.setQuantity(input.quantity());
-            item.setUnit(input.unit());
-            item.setBaseCalories(food.getCalories());
-            item.setBaseProteinG(food.getProteinG());
-            item.setBaseCarbsG(food.getCarbsG());
-            item.setBaseFatG(food.getFatG());
-            BigDecimal factor = expected == MealUnit.GRAMS
-                    ? input.quantity().movePointLeft(2) : input.quantity();
-            item.setCalories(scale(food.getCalories(), factor));
-            item.setProteinG(scale(food.getProteinG(), factor));
-            item.setCarbsG(scale(food.getCarbsG(), factor));
-            item.setFatG(scale(food.getFatG(), factor));
+            MealItem item = newItem(userId, meal, input);
             meal.getItems().add(item);
         }
         return response(meals.save(meal));
@@ -129,11 +97,26 @@ public class MealService {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "No repitas alimentos del registro.");
             }
         }
-        if (quantities.size() != meal.getItems().size()
-                || meal.getItems().stream().anyMatch(item -> !quantities.containsKey(item.getId()))) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "Esta edición debe conservar los alimentos del registro.");
+        var currentIds = meal.getItems().stream().map(MealItem::getId).collect(java.util.stream.Collectors.toSet());
+        if (!currentIds.containsAll(quantities.keySet())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Un alimento no pertenece a esta comida.");
         }
+        var additions = request.addedItems() == null ? List.<CreateMealRequest.Item>of() : request.addedItems();
+        int count = quantities.size() + additions.size();
+        if (count < 1 || count > 50) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "La comida debe tener entre 1 y 50 alimentos.");
+        }
+        if ((request.consumedAt() == null) != (request.timeZone() == null)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Indica fecha y zona horaria juntas.");
+        }
+        if (request.consumedAt() != null) validateDate(request.consumedAt(), request.timeZone());
+        var newItems = additions.stream().map(input -> newItem(userId, meal, input)).toList();
+        meal.getItems().removeIf(item -> !quantities.containsKey(item.getId()));
         meal.setMealType(request.mealType());
+        if (request.consumedAt() != null) {
+            meal.setConsumedAt(request.consumedAt());
+            meal.setTimeZone(request.timeZone());
+        }
         for (MealItem item : meal.getItems()) {
             item.setQuantity(quantities.get(item.getId()));
             BigDecimal factor = item.getUnit() == MealUnit.GRAMS
@@ -143,9 +126,51 @@ public class MealService {
             item.setCarbsG(scale(item.getBaseCarbsG(), factor));
             item.setFatG(scale(item.getBaseFatG(), factor));
         }
+        meal.getItems().addAll(newItems);
         // Los cambios en hijos también deben incrementar la versión de la comida.
         meal.setUpdatedAt(Instant.now());
         return response(meals.saveAndFlush(meal));
+    }
+
+    private void validateDate(Instant consumedAt, String timeZone) {
+        if (!ZoneId.getAvailableZoneIds().contains(timeZone)) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Selecciona una zona horaria IANA válida.");
+        }
+        if (consumedAt.isBefore(Instant.parse("1000-01-01T00:00:00Z"))) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "La fecha de consumo está fuera del rango admitido.");
+        }
+        if (consumedAt.isAfter(Instant.now())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "La fecha de consumo no puede estar en el futuro.");
+        }
+    }
+
+    private MealItem newItem(Long userId, Meal meal, CreateMealRequest.Item input) {
+        CustomFood food = foods.findByIdAndUserId(input.foodId(), userId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Alimento no disponible."));
+        MealUnit expected = food.getBasis() == NutritionBasis.PER_100_G
+                ? MealUnit.GRAMS : MealUnit.SERVINGS;
+        if (input.unit() != expected) {
+            throw new ApiException(HttpStatus.BAD_REQUEST,
+                    "La unidad debe coincidir con la base nutricional del alimento: " + expected);
+        }
+        MealItem item = new MealItem();
+        item.setMeal(meal);
+        item.setFoodId(food.getId());
+        item.setName(food.getName());
+        item.setBasis(food.getBasis());
+        item.setQuantity(input.quantity());
+        item.setUnit(input.unit());
+        item.setBaseCalories(food.getCalories());
+        item.setBaseProteinG(food.getProteinG());
+        item.setBaseCarbsG(food.getCarbsG());
+        item.setBaseFatG(food.getFatG());
+        BigDecimal factor = expected == MealUnit.GRAMS
+                ? input.quantity().movePointLeft(2) : input.quantity();
+        item.setCalories(scale(food.getCalories(), factor));
+        item.setProteinG(scale(food.getProteinG(), factor));
+        item.setCarbsG(scale(food.getCarbsG(), factor));
+        item.setFatG(scale(food.getFatG(), factor));
+        return item;
     }
 
     private BigDecimal scale(BigDecimal value, BigDecimal factor) {

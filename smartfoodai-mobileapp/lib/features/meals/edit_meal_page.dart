@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -9,6 +10,8 @@ import '../foods/food_models.dart';
 import 'meal_detail.dart';
 import 'meal_models.dart';
 import 'meals_api.dart';
+import 'meal_food_picker.dart';
+import '../foods/foods_api.dart';
 
 class EditMealPage extends ConsumerStatefulWidget {
   final int mealId;
@@ -21,6 +24,12 @@ class _EditMealPageState extends ConsumerState<EditMealPage> {
   final _form = GlobalKey<FormState>();
   final _quantities = <int, TextEditingController>{};
   late final MealsApi _api;
+  late final FoodsApi _foods;
+  final _retained = <SavedMealItem>[];
+  final _added = <int, CustomFood>{};
+  DateTime? _when;
+  String? _dateZone;
+  static const _zoneChannel = MethodChannel('smartfoodai/timezone');
   MealDetail? _meal;
   MealType _type = MealType.lunch;
   String? _error;
@@ -30,6 +39,7 @@ class _EditMealPageState extends ConsumerState<EditMealPage> {
   void initState() {
     super.initState();
     _api = MealsApi(ref.read(authProvider));
+    _foods = FoodsApi(ref.read(authProvider));
     _load();
   }
 
@@ -38,6 +48,7 @@ class _EditMealPageState extends ConsumerState<EditMealPage> {
     for (final field in _quantities.values) {
       field.dispose();
     }
+    _foods.dispose();
     _api.dispose();
     super.dispose();
   }
@@ -50,6 +61,8 @@ class _EditMealPageState extends ConsumerState<EditMealPage> {
     try {
       final meal = await _api.get(widget.mealId);
       if (!mounted) return;
+      _retained.addAll(meal.items);
+      _when = meal.summary.consumedAt;
       for (final item in meal.items) {
         _quantities[item.id] = TextEditingController(
           text: foodNumber(item.quantity),
@@ -112,11 +125,110 @@ class _EditMealPageState extends ConsumerState<EditMealPage> {
     if (mounted && discard == true) _exit();
   }
 
+  Future<void> _addFood() async {
+    if (_saving || _blocked || _confirming) return;
+    if (_retained.length + _added.length >= 50) {
+      setState(() => _error = 'Puedes añadir hasta 50 alimentos.');
+      return;
+    }
+    _confirming = true;
+    final selection = await showDialog<FoodSelection>(
+      context: context,
+      builder: (_) => MealFoodPicker(api: _foods),
+    );
+    _confirming = false;
+    if (!mounted || selection == null) return;
+    if (selection.food == null) {
+      final created = await context.push<bool>('/foods/create');
+      if (mounted && created == true) await _addFood();
+      return;
+    }
+    final food = selection.food!;
+    if (_retained.any((item) => item.foodId == food.id) ||
+        _added.containsKey(-food.id)) {
+      setState(
+        () => _error = 'Ese alimento ya está añadido. Ajusta su cantidad.',
+      );
+      return;
+    }
+    setState(() {
+      _added[-food.id] = food;
+      _quantities[-food.id] = TextEditingController(
+        text: food.basis == NutritionBasis.per100g ? '100' : '1',
+      );
+      _dirty = true;
+    });
+  }
+
+  void _remove(int key) {
+    setState(() {
+      _retained.removeWhere((item) => item.id == key);
+      _added.remove(key);
+      _dirty = true;
+    });
+    final controller = _quantities.remove(key);
+    WidgetsBinding.instance.addPostFrameCallback((_) => controller?.dispose());
+  }
+
+  Future<void> _pickWhen() async {
+    if (_saving || _blocked || _confirming) return;
+    _confirming = true;
+    try {
+      final zone = await _zoneChannel.invokeMethod<String>('getTimeZone');
+      if (!mounted) return;
+      if (zone == null || zone.isEmpty) throw const FormatException();
+      final date = await showDatePicker(
+        context: context,
+        initialDate: _when!.isBefore(DateTime(1970)) ? DateTime(1970) : _when!,
+        firstDate: DateTime(1970),
+        lastDate: DateTime.now(),
+      );
+      if (!mounted || date == null) return;
+      final time = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(_when!),
+      );
+      if (!mounted || time == null) return;
+      final when = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
+      if (when.isAfter(DateTime.now())) {
+        setState(
+          () => _error = 'La fecha y hora no pueden estar en el futuro.',
+        );
+        return;
+      }
+      setState(() {
+        _when = when;
+        _dateZone = zone;
+        _dirty = true;
+        _error = null;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _error = 'No pudimos leer la zona horaria del dispositivo. Inténtalo desde Android.',
+        );
+      }
+    } finally {
+      _confirming = false;
+    }
+  }
+
   Future<void> _save() async {
     if (_saving ||
+        _confirming ||
         _blocked ||
         _meal == null ||
         !_form.currentState!.validate()) {
+      return;
+    }
+    if (_retained.isEmpty && _added.isEmpty) {
+      setState(() => _error = 'La comida necesita al menos un alimento.');
       return;
     }
     FocusScope.of(context).unfocus();
@@ -125,10 +237,30 @@ class _EditMealPageState extends ConsumerState<EditMealPage> {
       _error = null;
     });
     try {
-      await _api.update(_meal!, _type, {
-        for (final entry in _quantities.entries)
-          entry.key: parseNutrient(entry.value.text)!,
-      });
+      if (_dateZone != null &&
+          await _zoneChannel.invokeMethod<String>('getTimeZone') != _dateZone) {
+        throw const ApiFailure(
+          'La zona horaria cambió. Vuelve al detalle y revisa la fecha.',
+        );
+      }
+      final additions = _added.entries
+          .map(
+            (entry) =>
+                MealEntry(entry.value)
+                  ..quantity = parseNutrient(_quantities[entry.key]!.text)!,
+          )
+          .toList();
+      await _api.update(
+        _meal!,
+        _type,
+        {
+          for (final item in _retained)
+            item.id: parseNutrient(_quantities[item.id]!.text)!,
+        },
+        added: additions,
+        consumedAt: _dateZone == null ? null : _when,
+        timeZone: _dateZone,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Comida actualizada.')));
@@ -219,12 +351,39 @@ class _EditMealPageState extends ConsumerState<EditMealPage> {
                         ),
                         const SizedBox(height: 16),
                         const Text(
-                          'Ajusta las cantidades. Se conservarán la fecha y los nutrientes originales de los alimentos.',
+                          'Los alimentos conservados mantienen sus nutrientes históricos. Los nuevos usan los valores actuales del catálogo.',
                           style: TextStyle(color: AppTheme.muted),
                         ),
                         const SizedBox(height: 20),
-                        for (final item in _meal!.items)
+                        if (_when != null)
+                          TextButton.icon(
+                            onPressed: _saving || _blocked ? null : _pickWhen,
+                            icon: const Icon(Icons.calendar_month),
+                            label: Text(
+                              '${_when!.day}/${_when!.month}/${_when!.year} · ${TimeOfDay.fromDateTime(_when!).format(context)} (hora local)',
+                            ),
+                          ),
+                        for (final item in [
+                          ..._retained.map(
+                            (item) => (
+                              id: item.id,
+                              name: item.name,
+                              unitLabel: item.unitLabel,
+                            ),
+                          ),
+                          ..._added.entries.map(
+                            (entry) => (
+                              id: entry.key,
+                              name: entry.value.name,
+                              unitLabel:
+                                  entry.value.basis == NutritionBasis.per100g
+                                  ? 'g'
+                                  : 'porciones',
+                            ),
+                          ),
+                        ])
                           Container(
+                            key: ValueKey(item.id),
                             margin: const EdgeInsets.only(bottom: 16),
                             padding: const EdgeInsets.all(18),
                             decoration: BoxDecoration(
@@ -238,6 +397,16 @@ class _EditMealPageState extends ConsumerState<EditMealPage> {
                                   item.name,
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: IconButton(
+                                    tooltip: 'Quitar ${item.name}',
+                                    onPressed: _saving || _blocked
+                                        ? null
+                                        : () => _remove(item.id),
+                                    icon: const Icon(Icons.delete_outline),
                                   ),
                                 ),
                                 const SizedBox(height: 12),
@@ -265,6 +434,12 @@ class _EditMealPageState extends ConsumerState<EditMealPage> {
                               ],
                             ),
                           ),
+                        OutlinedButton.icon(
+                          onPressed: _saving || _blocked ? null : _addFood,
+                          icon: const Icon(Icons.add_circle_outline),
+                          label: const Text('Añadir alimento'),
+                        ),
+                        const SizedBox(height: 16),
                         FilledButton(
                           onPressed: _saving || _blocked ? null : _save,
                           child: Text(

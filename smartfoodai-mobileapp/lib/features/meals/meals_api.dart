@@ -119,13 +119,20 @@ class MealsApi {
   Future<void> update(
     MealDetail meal,
     MealType type,
-    Map<int, double> quantities,
-  ) => auth.withAccessToken((token) async {
+    Map<int, double> quantities, {
+    List<MealEntry> added = const [],
+    DateTime? consumedAt,
+    String? timeZone,
+  }) => auth.withAccessToken((token) async {
     try {
       await _dio.put<dynamic>(
         '/${meal.summary.id}',
         options: Options(headers: {'Authorization': 'Bearer $token'}),
         data: {
+          if (consumedAt != null)
+            'consumedAt': consumedAt.toUtc().toIso8601String(),
+          'timeZone': ?timeZone,
+          'addedItems': added.map((entry) => entry.toJson()).toList(),
           'version': meal.version,
           'mealType': type.apiValue,
           'items': quantities.entries

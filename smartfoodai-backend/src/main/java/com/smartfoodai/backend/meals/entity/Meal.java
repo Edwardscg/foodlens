@@ -34,7 +34,7 @@ public class Meal {
     private Instant createdAt;
     @Column(name = "updated_at")
     private Instant updatedAt;
-    @OneToMany(mappedBy = "meal", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "meal", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("id ASC")
     private List<MealItem> items = new ArrayList<>();
     @PrePersist

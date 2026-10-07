@@ -22,21 +22,24 @@ class MealNutrition {
 }
 
 class SavedMealItem {
-  final int id;
+  final int id, foodId;
   final String name, unit;
   final double quantity;
   final MealNutrition nutrition;
   const SavedMealItem(
     this.id,
+    this.foodId,
     this.name,
     this.unit,
     this.quantity,
     this.nutrition,
   );
   factory SavedMealItem.fromJson(Map<String, dynamic> json) {
-    final id = json['id'];
+    final id = json['id'], foodId = json['foodId'];
     final name = json['name'], unit = json['unit'], quantity = json['quantity'];
-    if (id is! int ||
+    if (foodId is! int ||
+        foodId <= 0 ||
+        id is! int ||
         id <= 0 ||
         name is! String ||
         name.trim().isEmpty ||
@@ -48,6 +51,7 @@ class SavedMealItem {
     }
     return SavedMealItem(
       id,
+      foodId,
       name,
       unit as String,
       quantity.toDouble(),
