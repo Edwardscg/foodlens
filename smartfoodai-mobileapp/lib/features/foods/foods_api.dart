@@ -18,9 +18,12 @@ class FoodsApi {
   );
   FoodsApi(this.auth);
 
+  static const _uncertainSave =
+      'No pudimos confirmar el guardado. Revisa Mis alimentos antes de volver a enviarlo.';
+
   Future<T> _call<T>(
     Future<T> Function() operation, {
-    bool saving = false,
+    String? writeFailure,
   }) async {
     try {
       return await operation();
@@ -35,9 +38,7 @@ class FoodsApi {
       }
       if (error.type != DioExceptionType.badResponse) {
         throw ApiFailure(
-          saving
-              ? 'No pudimos confirmar el guardado. Revisa Mis alimentos antes de volver a enviarlo para evitar duplicados.'
-              : 'No pudimos cargar tus alimentos. Revisa tu conexión e inténtalo nuevamente.',
+          writeFailure ?? 'No pudimos cargar tus alimentos. Revisa tu conexión e inténtalo nuevamente.',
         );
       }
       throw ApiFailure(
@@ -46,23 +47,20 @@ class FoodsApi {
                 status != null &&
                 status < 500
             ? data['message'] as String
-            : saving
-            ? 'No pudimos confirmar el guardado. Revisa Mis alimentos antes de volver a enviarlo.'
-            : 'El servicio no está disponible. Inténtalo más tarde.',
+            : writeFailure ??
+                  'El servicio no está disponible. Inténtalo más tarde.',
         fields: fields,
         status: status,
       );
     } on FormatException {
       throw ApiFailure(
-        saving
-            ? 'La respuesta de guardado no es válida. Revisa Mis alimentos antes de reenviar.'
-            : 'La respuesta recibida no es válida. Inténtalo nuevamente.',
+        writeFailure ??
+            'La respuesta recibida no es válida. Inténtalo nuevamente.',
       );
     } on TypeError {
       throw ApiFailure(
-        saving
-            ? 'No pudimos leer la confirmación. Revisa Mis alimentos antes de reenviar.'
-            : 'La respuesta recibida no es válida. Inténtalo nuevamente.',
+        writeFailure ??
+            'La respuesta recibida no es válida. Inténtalo nuevamente.',
       );
     }
   }
@@ -89,7 +87,7 @@ class FoodsApi {
       return CustomFood.fromJson(
         Map<String, dynamic>.from(response.data as Map),
       );
-    }, saving: true),
+    }, writeFailure: _uncertainSave),
   );
 
   Future<CustomFood> get(int id) => auth.withAccessToken(
@@ -116,8 +114,20 @@ class FoodsApi {
           return CustomFood.fromJson(
             Map<String, dynamic>.from(response.data as Map),
           );
-        }, saving: true),
+        }, writeFailure: _uncertainSave),
       );
+
+  Future<void> delete(int id) => auth.withAccessToken(
+    (token) => _call(
+      () async {
+        await _dio.delete<void>(
+          '/$id',
+          options: Options(headers: {'Authorization': 'Bearer $token'}),
+        );
+      },
+      writeFailure: 'No pudimos confirmar la eliminación. Actualiza Mis alimentos para comprobar si sigue disponible.',
+    ),
+  );
 
   void dispose() => _dio.close(force: true);
 }

@@ -79,8 +79,8 @@ class MacroSummary extends StatelessWidget {
 
 class FoodCard extends StatelessWidget {
   final CustomFood food;
-  final VoidCallback? onEdit;
-  const FoodCard({super.key, required this.food, this.onEdit});
+  final VoidCallback? onEdit, onDelete;
+  const FoodCard({super.key, required this.food, this.onEdit, this.onDelete});
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(16),
@@ -139,14 +139,29 @@ class FoodCard extends StatelessWidget {
           protein: food.proteinG,
           fat: food.fatG,
         ),
-        if (onEdit != null) ...[
+        if (onEdit != null || onDelete != null) ...[
           const SizedBox(height: 12),
           Align(
             alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: onEdit,
-              icon: const Icon(Icons.edit_outlined, size: 18),
-              label: const Text('Editar'),
+            child: Wrap(
+              spacing: 8,
+              children: [
+                if (onEdit != null)
+                  TextButton.icon(
+                    onPressed: onEdit,
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('Editar'),
+                  ),
+                if (onDelete != null)
+                  TextButton.icon(
+                    onPressed: onDelete,
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    label: const Text('Eliminar'),
+                  ),
+              ],
             ),
           ),
         ],

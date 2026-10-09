@@ -37,6 +37,11 @@ public class CustomFoodService {
         return response(foods.save(food));
     }
 
+    @Transactional
+    public void delete(Long userId, Long id) {
+        foods.delete(owned(userId, id));
+    }
+
     private CustomFood owned(Long userId, Long id) {
         requireUser(userId);
         return foods.findByIdAndUserId(id, userId).orElseThrow(() ->

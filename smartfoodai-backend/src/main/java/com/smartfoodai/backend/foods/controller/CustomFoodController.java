@@ -32,6 +32,12 @@ public class CustomFoodController {
         return foods.update(userId, id, request);
     }
 
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@AuthenticationPrincipal Long userId, @PathVariable Long id) {
+        foods.delete(userId, id);
+    }
+
     @GetMapping
     public CustomFoodPage list(@AuthenticationPrincipal Long userId,
                                @RequestParam(name = "page", defaultValue = "0") int page,
