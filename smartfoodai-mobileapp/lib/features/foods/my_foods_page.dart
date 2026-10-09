@@ -22,6 +22,7 @@ class _MyFoodsPageState extends ConsumerState<MyFoodsPage> {
   bool _loaded = false;
   bool _lastReset = true;
   String? _error;
+  String _search = '';
   int _nextPage = 0, _totalPages = 0, _total = 0;
   @override
   void initState() {
@@ -36,12 +37,19 @@ class _MyFoodsPageState extends ConsumerState<MyFoodsPage> {
     setState(() {
       _loading = true;
       _error = null;
+      if (reset) {
+        _search = _filter.text.trim();
+        _items.clear();
+        _loaded = false;
+        _nextPage = 0;
+        _totalPages = 0;
+        _total = 0;
+      }
     });
     try {
-      final result = await _api.list(reset ? 0 : _nextPage);
+      final result = await _api.list(_nextPage, query: _search);
       if (!mounted) return;
       setState(() {
-        if (reset) _items.clear();
         final ids = _items.map((food) => food.id).toSet();
         _items.addAll(result.items.where((food) => ids.add(food.id)));
         _nextPage = result.page + 1;
@@ -52,11 +60,12 @@ class _MyFoodsPageState extends ConsumerState<MyFoodsPage> {
     } on ApiFailure catch (error) {
       if (mounted) setState(() => _error = error.message);
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(
-              () =>
-          _error = 'No pudimos cargar tus alimentos. Inténtalo nuevamente.',
+          () =>
+              _error = 'No pudimos cargar tus alimentos. Inténtalo nuevamente.',
         );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -83,10 +92,6 @@ class _MyFoodsPageState extends ConsumerState<MyFoodsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final query = _filter.text.trim().toLowerCase();
-    final visible = _items
-        .where((food) => food.name.toLowerCase().contains(query))
-        .toList();
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mis alimentos'),
@@ -112,10 +117,17 @@ class _MyFoodsPageState extends ConsumerState<MyFoodsPage> {
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
                 child: TextField(
                   controller: _filter,
-                  onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(
-                    hintText: 'Filtrar esta lista…',
-                    prefixIcon: Icon(Icons.search),
+                  enabled: !_loading,
+                  maxLength: 120,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => _load(reset: true),
+                  decoration: InputDecoration(
+                    hintText: 'Buscar en Mis alimentos',
+                    suffixIcon: IconButton(
+                      tooltip: 'Buscar',
+                      onPressed: _loading ? null : () => _load(reset: true),
+                      icon: const Icon(Icons.search),
+                    ),
                   ),
                 ),
               ),
@@ -130,8 +142,7 @@ class _MyFoodsPageState extends ConsumerState<MyFoodsPage> {
                         Padding(
                           padding: const EdgeInsets.only(bottom: 16),
                           child: Text(
-                            '${_items.length} de $_total alimentos. '
-                                '${_nextPage < _totalPages ? "Carga más para ampliar el filtro." : ""}',
+                            '${_items.length} de $_total alimentos',
                             style: const TextStyle(fontSize: 12),
                           ),
                         ),
@@ -155,7 +166,10 @@ class _MyFoodsPageState extends ConsumerState<MyFoodsPage> {
                           padding: EdgeInsets.all(24),
                           child: Center(child: CircularProgressIndicator()),
                         ),
-                      if (_loaded && visible.isEmpty && !_loading)
+                      if (_loaded &&
+                          _items.isEmpty &&
+                          !_loading &&
+                          _error == null)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 48),
                           child: Column(
@@ -163,28 +177,28 @@ class _MyFoodsPageState extends ConsumerState<MyFoodsPage> {
                               const Icon(Icons.restaurant_menu, size: 48),
                               const SizedBox(height: 16),
                               Text(
-                                _items.isEmpty
+                                _search.isEmpty
                                     ? 'Todavía no tienes alimentos'
-                                    : 'No hay coincidencias en esta lista',
+                                    : 'No encontramos alimentos con ese nombre',
                                 textAlign: TextAlign.center,
                                 style: Theme.of(context).textTheme.titleLarge,
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                _items.isEmpty
+                                _search.isEmpty
                                     ? 'Crea tu primer alimento con sus valores nutricionales.'
-                                    : 'Prueba otro nombre o carga más alimentos.',
+                                    : 'Prueba otro nombre o borra la búsqueda para ver todos.',
                                 textAlign: TextAlign.center,
                               ),
                             ],
                           ),
                         ),
-                      for (final food in visible)
+                      for (final food in _items)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 16),
                           child: FoodCard(key: ValueKey(food.id), food: food),
                         ),
-                      if (_nextPage < _totalPages)
+                      if (_nextPage < _totalPages && _error == null)
                         OutlinedButton(
                           onPressed: _loading ? null : () => _load(),
                           child: const Text('Cargar más alimentos'),
