@@ -12,6 +12,7 @@ import '../meals/meals_api.dart';
 import '../meals/meal_detail.dart';
 import '../profile/profile_controller.dart';
 import '../foods/food_models.dart';
+import '../water/water_card.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -241,6 +242,8 @@ class _HomePageState extends ConsumerState<HomePage>
                   const SizedBox(height: 16),
                 ],
                 _summary(),
+              const SizedBox(height: 20),
+              WaterCard(refresh: _revision),
                 const SizedBox(height: 24),
                 const Text(
                   'Registro de comidas',
