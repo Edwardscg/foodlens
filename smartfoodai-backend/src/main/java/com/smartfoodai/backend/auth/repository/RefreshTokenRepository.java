@@ -13,6 +13,8 @@ import java.util.Optional;
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
 
     Optional<RefreshToken> findByTokenHash(String tokenHash);
+    @Query("select token.userId from RefreshToken token where token.tokenHash = :hash")
+    Optional<Long> findUserIdByTokenHash(@Param("hash") String hash);
     List<RefreshToken> findByUserIdAndRevokedFalse(Long userId);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select token from RefreshToken token where token.tokenHash = :hash")

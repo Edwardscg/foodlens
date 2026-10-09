@@ -39,6 +39,9 @@ public class User {
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
+    @Column(name = "credential_version", nullable = false)
+    private long credentialVersion;
+
     private String name;
 
     @Column(name = "declared_age")

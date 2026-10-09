@@ -50,28 +50,31 @@ public class AuthService {
             throw new ApiException(HttpStatus.CONFLICT, "El correo ya está registrado");
         User user = users.saveAndFlush(User.builder().email(email)
                 .passwordHash(passwords.encode(request.password())).build());
-        return createSession(user.getId(), Instant.now().plus(refreshDays, ChronoUnit.DAYS));
+        return createSession(user, Instant.now().plus(refreshDays, ChronoUnit.DAYS));
     }
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
-        User user = users.findByEmailIgnoreCase(normalizeEmail(request.email())).orElse(null);
+        User user = users.findForUpdateByEmail(normalizeEmail(request.email())).orElse(null);
         boolean matches = passwords.matches(request.password(), user == null ? dummyHash : user.getPasswordHash());
         if (user == null || !matches)
             throw new ApiException(HttpStatus.UNAUTHORIZED, "Correo o contraseña incorrectos");
-        return createSession(user.getId(), Instant.now().plus(refreshDays, ChronoUnit.DAYS));
+        return createSession(user, Instant.now().plus(refreshDays, ChronoUnit.DAYS));
     }
 
     @Transactional
     public AuthResponse refresh(String rawToken) {
-        RefreshToken old = refreshTokens.findForUpdate(hash(rawToken))
-                .orElseThrow(this::invalidSession);
-        if (old.isRevoked() || !old.getExpiresAt().isAfter(Instant.now()) || !users.existsById(old.getUserId()))
+        String tokenHash = hash(rawToken);
+        var userId = refreshTokens.findUserIdByTokenHash(tokenHash).orElseThrow(this::invalidSession);
+        // Use the same user-first lock order as password recovery.
+        User user = users.findForUpdate(userId).orElseThrow(this::invalidSession);
+        RefreshToken old = refreshTokens.findForUpdate(tokenHash).orElseThrow(this::invalidSession);
+        if (old.isRevoked() || !old.getExpiresAt().isAfter(Instant.now()))
             throw invalidSession();
         old.setRevoked(true);
         refreshTokens.save(old);
         // Rotation keeps the original absolute expiration; it never extends the session.
-        return createSession(old.getUserId(), old.getExpiresAt());
+        return createSession(user, old.getExpiresAt());
     }
 
     @Transactional
@@ -89,13 +92,13 @@ public class AuthService {
         return new UserResponse(user.getId(), user.getEmail());
     }
 
-    private AuthResponse createSession(Long userId, Instant expiration) {
+    private AuthResponse createSession(User user, Instant expiration) {
         byte[] bytes = new byte[32];
         random.nextBytes(bytes);
         String rawToken = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        refreshTokens.save(RefreshToken.builder().userId(userId).tokenHash(hash(rawToken))
+        refreshTokens.save(RefreshToken.builder().userId(user.getId()).tokenHash(hash(rawToken))
                 .expiresAt(expiration).revoked(false).build());
-        return new AuthResponse(jwt.createAccessToken(userId), rawToken, jwt.getExpiresIn());
+        return new AuthResponse(jwt.createAccessToken(user.getId(), user.getCredentialVersion()), rawToken, jwt.getExpiresIn());
     }
 
     private String normalizeEmail(String email) { return email.strip().toLowerCase(Locale.ROOT); }

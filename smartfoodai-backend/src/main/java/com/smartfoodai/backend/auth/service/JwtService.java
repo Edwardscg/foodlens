@@ -24,20 +24,26 @@ public class JwtService {
         this.expiresIn = Math.multiplyExact(minutes, 60L);
     }
 
-    public String createAccessToken(Long userId) {
+    public String createAccessToken(Long userId, long credentialVersion) {
         Instant now = Instant.now();
         return Jwts.builder().issuer(ISSUER).subject(userId.toString())
+                .claim("cv", credentialVersion)
                 .issuedAt(Date.from(now)).expiration(Date.from(now.plusSeconds(expiresIn)))
                 .signWith(key, Jwts.SIG.HS256).compact();
     }
 
-    public Long readUserId(String token) {
+    public record SessionIdentity(Long userId, long credentialVersion) {}
+
+    public SessionIdentity readSession(String token) {
         var claims = Jwts.parser().verifyWith(key).requireIssuer(ISSUER).build()
                 .parseSignedClaims(token).getPayload();
         if (claims.getExpiration() == null) throw new IllegalArgumentException("Token sin expiración");
         long userId = Long.parseLong(claims.getSubject());
         if (userId <= 0) throw new IllegalArgumentException("Usuario no válido");
-        return userId;
+        Number version = claims.get("cv", Number.class);
+        long credentialVersion = version == null ? 0 : version.longValue();
+        if (credentialVersion < 0) throw new IllegalArgumentException("Versión no válida");
+        return new SessionIdentity(userId, credentialVersion);
     }
 
     public long getExpiresIn() { return expiresIn; }

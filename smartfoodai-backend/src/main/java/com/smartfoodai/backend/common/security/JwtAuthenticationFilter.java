@@ -33,16 +33,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain chain) throws ServletException, IOException {
         String authorization = request.getHeader("Authorization");
         if (authorization != null && authorization.startsWith("Bearer ")) {
-            Long userId = null;
+            JwtService.SessionIdentity identity = null;
             try {
-                userId = jwt.readUserId(authorization.substring(7));
+                identity = jwt.readSession(authorization.substring(7));
             } catch (JwtException | IllegalArgumentException exception) {
                 SecurityContextHolder.clearContext();
             }
-            if (userId != null) {
+            if (identity != null) {
                 boolean exists;
                 try {
-                    exists = users.existsById(userId);
+                    var user = users.findById(identity.userId()).orElse(null);
+                    exists = user != null && user.getCredentialVersion() == identity.credentialVersion();
                 } catch (org.springframework.dao.DataAccessException exception) {
                     response.setStatus(503);
                     response.setContentType("application/json;charset=UTF-8");
@@ -51,7 +52,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
                 if (exists) {
                     var context = SecurityContextHolder.createEmptyContext();
-                    context.setAuthentication(new UsernamePasswordAuthenticationToken(userId, null, List.of()));
+                    context.setAuthentication(new UsernamePasswordAuthenticationToken(identity.userId(), null, List.of()));
                     SecurityContextHolder.setContext(context);
                 }
             }
