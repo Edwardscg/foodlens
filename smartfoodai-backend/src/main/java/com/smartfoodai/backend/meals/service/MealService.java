@@ -173,6 +173,16 @@ public class MealService {
         return item;
     }
 
+    @Transactional(readOnly = true)
+    public com.smartfoodai.backend.meals.dto.MealSummary summary(Long userId, Instant start, Instant end) {
+        if (userId == null) throw new ApiException(HttpStatus.UNAUTHORIZED, "Inicia sesión para continuar.");
+        if (start == null || end == null || !start.isBefore(end)
+                || Duration.between(start, end).compareTo(Duration.ofHours(25)) > 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Selecciona un día válido.");
+        }
+        return meals.summarize(userId, start, end);
+    }
+
     private BigDecimal scale(BigDecimal value, BigDecimal factor) {
         return value.multiply(factor).setScale(2, RoundingMode.HALF_UP);
     }

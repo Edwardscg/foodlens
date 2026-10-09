@@ -110,6 +110,24 @@ class MealsApi {
     },
   );
 
+  Future<({int count, MealNutrition totals})> summary(
+    DateTime start,
+    DateTime end,
+  ) => _read(
+    '/summary',
+    (json) {
+      final count = json['mealCount'];
+      if (count is! int || count < 0) {
+        throw const FormatException('Invalid meal count');
+      }
+      return (count: count, totals: MealNutrition.fromJson(json));
+    },
+    query: {
+      'start': start.toUtc().toIso8601String(),
+      'end': end.toUtc().toIso8601String(),
+    },
+  );
+
   Future<MealDetail> get(int id) => _read('/$id', (json) {
     final meal = MealDetail.fromJson(json);
     if (meal.summary.id != id) throw const FormatException('Unexpected meal');

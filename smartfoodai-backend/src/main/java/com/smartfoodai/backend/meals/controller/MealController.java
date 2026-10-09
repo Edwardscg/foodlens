@@ -31,6 +31,11 @@ public class MealController {
                          @RequestParam(defaultValue = "20") int size) {
         return service.list(userId, start, end, page, size);
     }
+    @GetMapping("/summary")
+    public com.smartfoodai.backend.meals.dto.MealSummary summary(@AuthenticationPrincipal Long userId,
+            @RequestParam Instant start, @RequestParam Instant end) {
+        return service.summary(userId, start, end);
+    }
     @GetMapping("/{id}")
     public MealResponse get(@AuthenticationPrincipal Long userId, @PathVariable Long id) {
         return service.get(userId, id);
