@@ -32,21 +32,21 @@ class MacroSummary extends StatelessWidget {
               child: total == 0
                   ? const ColoredBox(color: Color(0xFFE6E9E1))
                   : Row(
-                children: [
-                  for (var i = 0; i < 3; i++)
-                    if (values[i] > 0)
-                      Expanded(
-                        flex: (values[i] / total * 10000)
-                            .round()
-                            .clamp(1, 10000)
-                            .toInt(),
-                        child: ColoredBox(
-                          color: colors[i],
-                          child: const SizedBox.expand(),
-                        ),
-                      ),
-                ],
-              ),
+                      children: [
+                        for (var i = 0; i < 3; i++)
+                          if (values[i] > 0)
+                            Expanded(
+                              flex: (values[i] / total * 10000)
+                                  .round()
+                                  .clamp(1, 10000)
+                                  .toInt(),
+                              child: ColoredBox(
+                                color: colors[i],
+                                child: const SizedBox.expand(),
+                              ),
+                            ),
+                      ],
+                    ),
             ),
           ),
         ),
@@ -79,7 +79,8 @@ class MacroSummary extends StatelessWidget {
 
 class FoodCard extends StatelessWidget {
   final CustomFood food;
-  const FoodCard({super.key, required this.food});
+  final VoidCallback? onEdit;
+  const FoodCard({super.key, required this.food, this.onEdit});
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(16),
@@ -138,6 +139,17 @@ class FoodCard extends StatelessWidget {
           protein: food.proteinG,
           fat: food.fatG,
         ),
+        if (onEdit != null) ...[
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: onEdit,
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              label: const Text('Editar'),
+            ),
+          ),
+        ],
       ],
     ),
   );

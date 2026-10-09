@@ -19,9 +19,9 @@ class FoodsApi {
   FoodsApi(this.auth);
 
   Future<T> _call<T>(
-      Future<T> Function() operation, {
-        bool saving = false,
-      }) async {
+    Future<T> Function() operation, {
+    bool saving = false,
+  }) async {
     try {
       return await operation();
     } on DioException catch (error) {
@@ -42,9 +42,9 @@ class FoodsApi {
       }
       throw ApiFailure(
         data is Map &&
-            data['message'] is String &&
-            status != null &&
-            status < 500
+                data['message'] is String &&
+                status != null &&
+                status < 500
             ? data['message'] as String
             : saving
             ? 'No pudimos confirmar el guardado. Revisa Mis alimentos antes de volver a enviarlo.'
@@ -68,7 +68,7 @@ class FoodsApi {
   }
 
   Future<FoodPage> list(int page, {String query = ''}) => auth.withAccessToken(
-        (token) => _call(() async {
+    (token) => _call(() async {
       final response = await _dio.get<dynamic>(
         '',
         queryParameters: {'page': page, 'size': 20, 'q': query},
@@ -80,7 +80,7 @@ class FoodsApi {
   );
 
   Future<CustomFood> create(Map<String, dynamic> data) => auth.withAccessToken(
-        (token) => _call(() async {
+    (token) => _call(() async {
       final response = await _dio.post<dynamic>(
         '',
         data: data,
@@ -91,6 +91,33 @@ class FoodsApi {
       );
     }, saving: true),
   );
+
+  Future<CustomFood> get(int id) => auth.withAccessToken(
+    (token) => _call(() async {
+      final response = await _dio.get<dynamic>(
+        '/$id',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      return CustomFood.fromJson(
+        Map<String, dynamic>.from(response.data as Map),
+      );
+    }),
+    retryUnauthorized: true,
+  );
+
+  Future<CustomFood> update(int id, Map<String, dynamic> data) =>
+      auth.withAccessToken(
+        (token) => _call(() async {
+          final response = await _dio.put<dynamic>(
+            '/$id',
+            data: data,
+            options: Options(headers: {'Authorization': 'Bearer $token'}),
+          );
+          return CustomFood.fromJson(
+            Map<String, dynamic>.from(response.data as Map),
+          );
+        }, saving: true),
+      );
 
   void dispose() => _dio.close(force: true);
 }

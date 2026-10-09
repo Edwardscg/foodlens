@@ -21,13 +21,35 @@ public class CustomFoodService {
         requireUser(userId);
         var food = new CustomFood();
         food.setUserId(userId);
+        apply(food, request);
+        return response(foods.save(food));
+    }
+
+    @Transactional(readOnly = true)
+    public CustomFoodResponse get(Long userId, Long id) {
+        return response(owned(userId, id));
+    }
+
+    @Transactional
+    public CustomFoodResponse update(Long userId, Long id, CreateCustomFoodRequest request) {
+        var food = owned(userId, id);
+        apply(food, request);
+        return response(foods.save(food));
+    }
+
+    private CustomFood owned(Long userId, Long id) {
+        requireUser(userId);
+        return foods.findByIdAndUserId(id, userId).orElseThrow(() ->
+                new ApiException(HttpStatus.NOT_FOUND, "No encontramos ese alimento"));
+    }
+
+    private void apply(CustomFood food, CreateCustomFoodRequest request) {
         food.setName(request.name().strip());
         food.setBasis(request.basis());
         food.setCalories(request.calories());
         food.setProteinG(request.proteinG());
         food.setCarbsG(request.carbsG());
         food.setFatG(request.fatG());
-        return response(foods.save(food));
     }
 
     @Transactional(readOnly = true)

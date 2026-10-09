@@ -83,6 +83,17 @@ class _MyFoodsPageState extends ConsumerState<MyFoodsPage> {
     await _load(reset: true);
   }
 
+  Future<void> _edit(CustomFood food) async {
+    final saved = await context.push<bool>('/foods/${food.id}/edit');
+    if (!mounted) return;
+    if (saved == true) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Alimento actualizado')));
+    }
+    // Confirm the current catalog even if the save response was lost.
+    await _load(reset: true);
+  }
+
   @override
   void dispose() {
     _api.dispose();
@@ -196,7 +207,11 @@ class _MyFoodsPageState extends ConsumerState<MyFoodsPage> {
                       for (final food in _items)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 16),
-                          child: FoodCard(key: ValueKey(food.id), food: food),
+                          child: FoodCard(
+                            key: ValueKey(food.id),
+                            food: food,
+                            onEdit: _loading ? null : () => _edit(food),
+                          ),
                         ),
                       if (_nextPage < _totalPages && _error == null)
                         OutlinedButton(

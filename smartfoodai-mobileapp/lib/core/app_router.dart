@@ -24,10 +24,12 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: Listenable.merge([auth, profile]),
     redirect: (context, state) {
       final path = state.uri.path;
-      if (auth.status == AuthStatus.restoring)
+      if (auth.status == AuthStatus.restoring) {
         return path == '/loading' ? null : '/loading';
-      if (auth.status == AuthStatus.offline)
+      }
+      if (auth.status == AuthStatus.offline) {
         return path == '/connection' ? null : '/connection';
+      }
       if (auth.status == AuthStatus.signedOut) {
         return path == '/login' || path == '/register' ? null : '/login';
       }
@@ -38,6 +40,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         return path == '/onboarding' ? null : '/onboarding';
       }
       if (RegExp(r'^/history/[1-9][0-9]*(/edit)?$').hasMatch(path) &&
+          int.tryParse(path.split('/')[2]) != null) {
+        return null;
+      }
+      if (RegExp(r'^/foods/[1-9][0-9]*/edit$').hasMatch(path) &&
           int.tryParse(path.split('/')[2]) != null) {
         return null;
       }
@@ -56,46 +62,61 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/loading',
-        builder: (_, __) =>
+        builder: (_, _) =>
             const Scaffold(body: Center(child: CircularProgressIndicator())),
       ),
-      GoRoute(path: '/connection', builder: (_, __) => const _ConnectionPage()),
+      GoRoute(path: '/connection', builder: (_, _) => const _ConnectionPage()),
       GoRoute(
         path: '/login',
-        builder: (_, __) => const AuthPage(key: ValueKey('login')),
+        builder: (_, _) => const AuthPage(key: ValueKey('login')),
       ),
       GoRoute(
         path: '/register',
-        builder: (_, __) =>
+        builder: (_, _) =>
             const AuthPage(key: ValueKey('register'), register: true),
       ),
       GoRoute(
         path: '/profile-loading',
-        builder: (_, __) => const ProfileStatusPage(),
+        builder: (_, _) => const ProfileStatusPage(),
       ),
-      GoRoute(path: '/onboarding', builder: (_, __) => const OnboardingPage()),
+      GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingPage()),
       GoRoute(
         path: '/profile/edit',
-        builder: (_, __) => const OnboardingPage(editing: true),
+        builder: (_, _) => const OnboardingPage(editing: true),
       ),
-      GoRoute(path: '/history', builder: (_, _) => const MealHistoryScreen(), routes: [
-        GoRoute(path: ':mealId', builder: (_, state) => MealDetailPage(
-          mealId: int.parse(state.pathParameters['mealId']!),
-        ), routes: [
-          GoRoute(path: 'edit', builder: (_, state) => EditMealPage(
-            key: ValueKey(state.pathParameters['mealId']),
-            mealId: int.parse(state.pathParameters['mealId']!),
-          )),
-        ]),
-      ]),
-      GoRoute(path: '/home', builder: (_, __) => const HomePage()),
-      GoRoute(path: '/account', builder: (_, __) => const AccountPage()),
-      GoRoute(path: '/meals/create', builder: (_, _) => const CreateMealPage()),
-      GoRoute(path: '/foods', builder: (_, __) => const MyFoodsPage()),
       GoRoute(
-        path: '/foods/create',
-        builder: (_, __) => const CreateFoodPage(),
+        path: '/history',
+        builder: (_, _) => const MealHistoryScreen(),
+        routes: [
+          GoRoute(
+            path: ':mealId',
+            builder: (_, state) => MealDetailPage(
+              mealId: int.parse(state.pathParameters['mealId']!),
+            ),
+            routes: [
+              GoRoute(
+                path: 'edit',
+                builder: (_, state) => EditMealPage(
+                  key: ValueKey(state.pathParameters['mealId']),
+                  mealId: int.parse(state.pathParameters['mealId']!),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
+      GoRoute(path: '/home', builder: (_, _) => const HomePage()),
+      GoRoute(path: '/account', builder: (_, _) => const AccountPage()),
+      GoRoute(path: '/meals/create', builder: (_, _) => const CreateMealPage()),
+      GoRoute(
+        path: '/foods/:foodId/edit',
+        builder: (_, state) => CreateFoodPage(
+          key: ValueKey(state.pathParameters['foodId']),
+          foodId: int.parse(state.pathParameters['foodId']!),
+        ),
+      ),
+      GoRoute(path: '/foods', builder: (_, _) => const MyFoodsPage()),
+      GoRoute(path: '/foods/create', builder: (_, _) => const CreateFoodPage()),
     ],
   );
   ref.onDispose(router.dispose);

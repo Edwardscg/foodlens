@@ -21,6 +21,17 @@ public class CustomFoodController {
         return foods.create(userId, request);
     }
 
+    @GetMapping("/{id}")
+    public CustomFoodResponse get(@AuthenticationPrincipal Long userId, @PathVariable Long id) {
+        return foods.get(userId, id);
+    }
+
+    @PutMapping("/{id}")
+    public CustomFoodResponse update(@AuthenticationPrincipal Long userId, @PathVariable Long id,
+                                     @Valid @RequestBody CreateCustomFoodRequest request) {
+        return foods.update(userId, id, request);
+    }
+
     @GetMapping
     public CustomFoodPage list(@AuthenticationPrincipal Long userId,
                                @RequestParam(name = "page", defaultValue = "0") int page,
