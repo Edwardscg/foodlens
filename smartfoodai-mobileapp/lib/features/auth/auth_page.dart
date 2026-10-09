@@ -235,6 +235,16 @@ class _AuthPageState extends ConsumerState<AuthPage> {
                             ],
                           ),
                         ],
+                        if (!register)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: auth.busy
+                                  ? null
+                                  : () => context.push('/forgot-password'),
+                              child: const Text('¿Olvidaste tu contraseña?'),
+                            ),
+                          ),
                         if (auth.message != null) ...[
                           const SizedBox(height: 20),
                           _Message(auth.message!, error: true),

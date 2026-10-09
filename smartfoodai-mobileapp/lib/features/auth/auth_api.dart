@@ -14,14 +14,18 @@ class AuthApi {
     ),
   );
 
-  Future<T> _call<T>(Future<T> Function() operation) async {
+  Future<T> _call<T>(
+    Future<T> Function() operation, {
+    String? uncertainMessage,
+  }) async {
     try {
       return await operation();
     } on DioException catch (error) {
       final status = error.response?.statusCode;
       if (error.type != DioExceptionType.badResponse) {
-        throw const ApiFailure(
-          'No pudimos conectar. Revisa tu conexión e inténtalo nuevamente.',
+        throw ApiFailure(
+          uncertainMessage ??
+              'No pudimos conectar. Revisa tu conexión e inténtalo nuevamente.',
         );
       }
       final data = error.response?.data;
@@ -32,29 +36,32 @@ class AuthApi {
         });
       }
       final safeMessage =
-      data is Map &&
-          data['message'] is String &&
-          status != null &&
-          status < 500
+          data is Map &&
+              data['message'] is String &&
+              status != null &&
+              status < 500
           ? data['message'] as String
-          : 'No se pudo completar la operación. Inténtalo más tarde.';
+          : uncertainMessage ??
+                'No se pudo completar la operación. Inténtalo más tarde.';
       throw ApiFailure(safeMessage, fields: fields, status: status);
     } on FormatException {
-      throw const ApiFailure(
-        'La respuesta recibida no es válida. Inténtalo nuevamente.',
+      throw ApiFailure(
+        uncertainMessage ??
+            'La respuesta recibida no es válida. Inténtalo nuevamente.',
       );
     } on TypeError {
-      throw const ApiFailure(
-        'La respuesta recibida no es válida. Inténtalo nuevamente.',
+      throw ApiFailure(
+        uncertainMessage ??
+            'La respuesta recibida no es válida. Inténtalo nuevamente.',
       );
     }
   }
 
   Future<AuthSession> signIn(
-      String email,
-      String password, {
-        required bool register,
-      }) => _call(() async {
+    String email,
+    String password, {
+    required bool register,
+  }) => _call(() async {
     final response = await _dio.post<dynamic>(
       register ? '/register' : '/login',
       data: {'email': email.trim(), 'password': password},
@@ -78,5 +85,22 @@ class AuthApi {
   Future<void> logout(String token) => _call(() async {
     await _dio.post<dynamic>('/logout', data: {'refreshToken': token});
   });
+  Future<void> requestRecovery(String email) => _call(
+    () async {
+      await _dio.post<void>('/forgot-password', data: {'email': email.trim()});
+    },
+    uncertainMessage: 'No pudimos confirmar la solicitud. Revisa tu correo antes de intentarlo nuevamente.',
+  );
+
+  Future<void> resetPassword(String code, String password) => _call(
+    () async {
+      await _dio.post<void>(
+        '/reset-password',
+        data: {'token': code.trim(), 'newPassword': password},
+      );
+    },
+    uncertainMessage: 'No pudimos confirmar el cambio. Intenta iniciar sesión con la nueva contraseña antes de repetirlo.',
+  );
+
   void dispose() => _dio.close(force: true);
 }

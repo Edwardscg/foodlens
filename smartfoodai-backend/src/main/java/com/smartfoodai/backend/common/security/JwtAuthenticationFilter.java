@@ -14,7 +14,8 @@ import java.util.Set;
 
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final Set<String> PUBLIC_POSTS = Set.of(
-            "/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout");
+            "/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout",
+            "/api/auth/forgot-password", "/api/auth/reset-password");
     private final JwtService jwt;
     private final UserRepository users;
 

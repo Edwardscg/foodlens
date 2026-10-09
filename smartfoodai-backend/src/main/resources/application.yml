@@ -1,6 +1,18 @@
 spring:
   application:
     name: smartfoodai-backend
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      "[mail.smtp.auth]": ${SMTP_AUTH:true}
+      "[mail.smtp.starttls.enable]": true
+      "[mail.smtp.starttls.required]": true
+      "[mail.smtp.connectiontimeout]": 5000
+      "[mail.smtp.timeout]": 5000
+      "[mail.smtp.writetimeout]": 5000
   datasource:
     url: jdbc:mysql://${MYSQLHOST}:${MYSQLPORT}/${MYSQLDATABASE}
     username: ${MYSQLUSER}
@@ -13,6 +25,9 @@ spring:
     open-in-view: false
 
 app:
+  recovery:
+    enabled: ${SMTP_ENABLED:false}
+    from: ${SMTP_FROM:}
   jwt:
     secret: ${JWT_SECRET}
     access-token-minutes: 20

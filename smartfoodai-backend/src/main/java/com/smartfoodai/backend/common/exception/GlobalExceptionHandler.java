@@ -22,7 +22,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                                                                   HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         Map<String, String> errors = new LinkedHashMap<>();
         ex.getBindingResult().getFieldErrors().forEach(error -> {
-            String field = error.getField().equals("passwordWithinByteLimit") ? "password" : error.getField();
+            String field = switch (error.getField()) {
+                case "passwordWithinByteLimit" -> "password";
+                case "newPasswordWithinByteLimit" -> "newPassword";
+                default -> error.getField();
+            };
             errors.putIfAbsent(field, error.getDefaultMessage() == null ? "Valor no válido" : error.getDefaultMessage());
         });
         return new ResponseEntity<>(new ErrorResponse("Revisa los datos ingresados", errors), headers, status);

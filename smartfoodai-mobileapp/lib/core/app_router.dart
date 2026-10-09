@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../features/auth/auth_controller.dart';
 import '../features/auth/auth_page.dart';
+import '../features/auth/recovery_page.dart';
 import '../features/auth/account_page.dart';
 import '../features/home/home_page.dart';
 import '../features/foods/my_foods_page.dart';
@@ -31,7 +32,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         return path == '/connection' ? null : '/connection';
       }
       if (auth.status == AuthStatus.signedOut) {
-        return path == '/login' || path == '/register' ? null : '/login';
+        return {'/login', '/register', '/forgot-password'}.contains(path)
+            ? null
+            : '/login';
       }
       if (profile.profile == null) {
         return path == '/profile-loading' ? null : '/profile-loading';
@@ -69,6 +72,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         builder: (_, _) => const AuthPage(key: ValueKey('login')),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        builder: (_, _) => const RecoveryPage(),
       ),
       GoRoute(
         path: '/register',
