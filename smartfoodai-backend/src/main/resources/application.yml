@@ -1,4 +1,8 @@
 spring:
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   application:
     name: smartfoodai-backend
   mail:
@@ -25,6 +29,9 @@ spring:
     open-in-view: false
 
 app:
+  gemini:
+    api-key: ${GEMINI_API_KEY:}
+    model: ${GEMINI_MODEL:gemini-3.8-flash}
   recovery:
     enabled: ${SMTP_ENABLED:false}
     from: ${SMTP_FROM:}
