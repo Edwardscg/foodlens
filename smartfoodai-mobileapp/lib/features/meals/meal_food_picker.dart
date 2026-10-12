@@ -12,7 +12,8 @@ class FoodSelection {
 
 class MealFoodPicker extends StatefulWidget {
   final FoodsApi api;
-  const MealFoodPicker({super.key, required this.api});
+  final String initialQuery;
+  const MealFoodPicker({super.key, required this.api, this.initialQuery = ''});
   @override
   State<MealFoodPicker> createState() => _MealFoodPickerState();
 }
@@ -27,6 +28,7 @@ class _MealFoodPickerState extends State<MealFoodPicker> {
   @override
   void initState() {
     super.initState();
+    _query.text = widget.initialQuery;
     _load(reset: true);
   }
 
