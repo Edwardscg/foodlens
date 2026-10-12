@@ -14,6 +14,7 @@ import '../auth/auth_models.dart';
 import 'detected_food.dart';
 import 'photo_analysis_api.dart';
 import 'photo_food_review.dart';
+import 'photo_meal_draft.dart';
 
 class PhotoAnalysisPage extends ConsumerStatefulWidget {
   const PhotoAnalysisPage({super.key});
@@ -301,7 +302,26 @@ class _PhotoAnalysisPageState extends ConsumerState<PhotoAnalysisPage> {
                         ? 'Prueba con otra imagen o registra tu comida manualmente.'
                         : 'Las cantidades de la foto son estimaciones: revísalas antes de registrar tu comida.',
                   ),
-                  PhotoFoodReview(key: ObjectKey(_foods), detected: _foods!),
+                  PhotoFoodReview(
+                    key: ObjectKey(_foods),
+                    detected: _foods!,
+                    onConfirm: (entries) async {
+                      final saved = await context.push<bool>(
+                        '/meals/create',
+                        extra: PhotoMealDraft(_image!, entries),
+                      );
+                      if (!mounted || saved != true) return;
+                      setState(() => _allowExit = true);
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!context.mounted) return;
+                        if (context.canPop()) {
+                          context.pop(true);
+                        } else {
+                          context.go('/home');
+                        }
+                      });
+                    },
+                  ),
                   const SizedBox(height: 16),
                 ],
                 if (_image != null && _foods == null)

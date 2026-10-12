@@ -1,3 +1,4 @@
+import '../features/meal_analysis/photo_meal_draft.dart';
 import '../features/meal_analysis/photo_analysis_page.dart';
 
 import 'package:flutter/material.dart';
@@ -118,7 +119,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/analyze', builder: (_, _) => const PhotoAnalysisPage()),
       GoRoute(path: '/home', builder: (_, _) => const HomePage()),
       GoRoute(path: '/account', builder: (_, _) => const AccountPage()),
-      GoRoute(path: '/meals/create', builder: (_, _) => const CreateMealPage()),
+      GoRoute(
+        path: '/meals/create',
+        builder: (_, state) => CreateMealPage(
+          photo: state.extra is PhotoMealDraft
+              ? state.extra as PhotoMealDraft
+              : null,
+        ),
+      ),
       GoRoute(
         path: '/foods/:foodId/edit',
         builder: (_, state) => CreateFoodPage(

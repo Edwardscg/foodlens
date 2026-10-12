@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 
 import '../../core/api_config.dart';
@@ -27,18 +30,31 @@ class MealsApi {
     MealType type,
     DateTime consumedAt,
     String zone,
-    List<MealEntry> entries,
-  ) => auth.withAccessToken((token) async {
+    List<MealEntry> entries, {
+    Uint8List? image,
+  }) => auth.withAccessToken((token) async {
     try {
+      final meal = {
+        'mealType': type.apiValue,
+        'consumedAt': consumedAt.toUtc().toIso8601String(),
+        'timeZone': zone,
+        'items': entries.map((item) => item.toJson()).toList(),
+      };
       final response = await _dio.post<dynamic>(
-        '',
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
-        data: {
-          'mealType': type.apiValue,
-          'consumedAt': consumedAt.toUtc().toIso8601String(),
-          'timeZone': zone,
-          'items': entries.map((item) => item.toJson()).toList(),
-        },
+        image == null ? '' : '/photo',
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          sendTimeout: const Duration(seconds: 30),
+        ),
+        data: image == null
+            ? meal
+            : FormData.fromMap({
+                'meal': MultipartFile.fromString(
+                  jsonEncode(meal),
+                  contentType: DioMediaType('application', 'json'),
+                ),
+                'image': MultipartFile.fromBytes(image, filename: 'meal-image'),
+              }),
       );
       final data = response.data;
       if (data is! Map || data['id'] is! int || (data['id'] as int) <= 0) {
@@ -63,6 +79,27 @@ class MealsApi {
       );
     }
   });
+
+  Future<Uint8List> photo(int mealId) => auth.withAccessToken((token) async {
+    try {
+      final response = await _dio.get<List<int>>(
+        '/$mealId/photo',
+        options: Options(
+          responseType: ResponseType.bytes,
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      if (response.data == null || response.data!.isEmpty) {
+        throw const ApiFailure('No pudimos leer la foto.');
+      }
+      return Uint8List.fromList(response.data!);
+    } on DioException catch (error) {
+      throw ApiFailure(
+        'No pudimos cargar la foto. Inténtalo nuevamente.',
+        status: error.response?.statusCode,
+      );
+    }
+  }, retryUnauthorized: true);
 
   Future<T> _read<T>(
     String path,

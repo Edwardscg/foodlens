@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,6 +22,9 @@ class MealDetailPage extends ConsumerStatefulWidget {
 class _MealDetailPageState extends ConsumerState<MealDetailPage> {
   late final MealsApi _api;
   MealDetail? _meal;
+  Uint8List? _photo;
+  String? _photoError;
+  bool _loadingPhoto = false;
   String? _error;
   bool _loading = true, _unavailable = false;
   int _revision = 0;
@@ -52,11 +57,16 @@ class _MealDetailPageState extends ConsumerState<MealDetailPage> {
       _deleteError = null;
       _error = null;
       _meal = null;
+      _photo = null;
+      _photoError = null;
       _unavailable = false;
     });
     try {
       final meal = await _api.get(widget.mealId);
-      if (mounted && revision == _revision) setState(() => _meal = meal);
+      if (mounted && revision == _revision) {
+        setState(() => _meal = meal);
+        if (meal.summary.origin == 'PHOTO') await _loadPhoto(revision);
+      }
     } on ApiFailure catch (error) {
       if (mounted && revision == _revision) {
         setState(() {
@@ -70,6 +80,23 @@ class _MealDetailPageState extends ConsumerState<MealDetailPage> {
       }
     } finally {
       if (mounted && revision == _revision) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadPhoto(int revision) async {
+    setState(() {
+      _loadingPhoto = true;
+      _photoError = null;
+    });
+    try {
+      final image = await _api.photo(widget.mealId);
+      if (mounted && revision == _revision) setState(() => _photo = image);
+    } on ApiFailure catch (error) {
+      if (mounted && revision == _revision)
+        setState(() => _photoError = error.message);
+    } finally {
+      if (mounted && revision == _revision)
+        setState(() => _loadingPhoto = false);
     }
   }
 
@@ -166,6 +193,30 @@ class _MealDetailPageState extends ConsumerState<MealDetailPage> {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
+        if (summary.origin == 'PHOTO') ...[
+          if (_photo != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.memory(
+                _photo!,
+                height: 240,
+                fit: BoxFit.contain,
+                cacheWidth: 1000,
+                semanticLabel: 'Foto privada de esta comida',
+                errorBuilder: (_, _, _) =>
+                    const Text('No pudimos mostrar la foto.'),
+              ),
+            ),
+          if (_loadingPhoto) const LinearProgressIndicator(),
+          if (_photoError != null) ...[
+            Text(_photoError!),
+            TextButton(
+              onPressed: _loadingPhoto ? null : () => _loadPhoto(_revision),
+              child: const Text('Reintentar foto'),
+            ),
+          ],
+          const SizedBox(height: 20),
+        ],
         _card(
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -184,7 +235,11 @@ class _MealDetailPageState extends ConsumerState<MealDetailPage> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Origen: ${summary.origin == 'MANUAL' ? 'Registro manual' : summary.origin}',
+                'Origen: ${summary.origin == 'MANUAL'
+                    ? 'Registro manual'
+                    : summary.origin == 'PHOTO'
+                    ? 'Registro con foto'
+                    : summary.origin}',
               ),
               Text(
                 'Zona del registro: ${meal.timeZone}',

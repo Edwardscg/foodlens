@@ -12,9 +12,11 @@ import '../foods/foods_api.dart';
 import 'meal_food_picker.dart';
 import 'meal_models.dart';
 import 'meals_api.dart';
+import '../meal_analysis/photo_meal_draft.dart';
 
 class CreateMealPage extends ConsumerStatefulWidget {
-  const CreateMealPage({super.key});
+  final PhotoMealDraft? photo;
+  const CreateMealPage({super.key, this.photo});
   @override
   ConsumerState<CreateMealPage> createState() => _CreateMealPageState();
 }
@@ -37,6 +39,10 @@ class _CreateMealPageState extends ConsumerState<CreateMealPage> {
     final auth = ref.read(authProvider);
     _api = MealsApi(auth);
     _foods = FoodsApi(auth);
+    if (widget.photo != null) {
+      _entries.addAll(widget.photo!.entries);
+      _dirty = true;
+    }
     _loadZone();
   }
 
@@ -221,7 +227,13 @@ class _CreateMealPageState extends ConsumerState<CreateMealPage> {
           'La zona horaria cambió. Vuelve a abrir el registro para actualizar la fecha y hora.',
         );
       }
-      await _api.create(_type, _when, _zone!, _entries);
+      await _api.create(
+        _type,
+        _when,
+        _zone!,
+        _entries,
+        image: widget.photo?.image,
+      );
       if (mounted) _exit(saved: true);
     } on MealSaveFailure catch (error) {
       if (mounted) {
@@ -277,7 +289,11 @@ class _CreateMealPageState extends ConsumerState<CreateMealPage> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Registrar comida'),
+          title: Text(
+            widget.photo == null
+                ? 'Registrar comida'
+                : 'Confirmar comida con foto',
+          ),
           leading: IconButton(
             tooltip: 'Volver',
             onPressed: _saving ? null : _leave,
@@ -292,6 +308,23 @@ class _CreateMealPageState extends ConsumerState<CreateMealPage> {
               child: ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
+                  if (widget.photo != null) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.memory(
+                        widget.photo!.image,
+                        height: 180,
+                        fit: BoxFit.contain,
+                        cacheWidth: 800,
+                        semanticLabel: 'Foto de la comida que vas a guardar',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'La foto se guardará de forma privada junto con esta comida.',
+                    ),
+                    const SizedBox(height: 20),
+                  ],
                   if (_error != null) ...[
                     Semantics(
                       liveRegion: true,
@@ -414,7 +447,7 @@ class _CreateMealPageState extends ConsumerState<CreateMealPage> {
                     ),
                   for (final entry in _entries)
                     Padding(
-                      key: ValueKey(entry.food.id),
+                      key: ObjectKey(entry),
                       padding: const EdgeInsets.only(bottom: 12),
                       child: _card(
                         Column(

@@ -13,7 +13,12 @@ import 'review_food.dart';
 
 class PhotoFoodReview extends ConsumerStatefulWidget {
   final List<DetectedFood> detected;
-  const PhotoFoodReview({super.key, required this.detected});
+  final Future<void> Function(List<MealEntry>) onConfirm;
+  const PhotoFoodReview({
+    super.key,
+    required this.detected,
+    required this.onConfirm,
+  });
   @override
   ConsumerState<PhotoFoodReview> createState() => _PhotoFoodReviewState();
 }
@@ -195,6 +200,20 @@ class _PhotoFoodReviewState extends ConsumerState<PhotoFoodReview> {
           label: const Text('Añadir alimento'),
         ),
         const SizedBox(height: 16),
+        FilledButton.icon(
+          onPressed: !complete || _choosing
+              ? null
+              : () async {
+                  setState(() => _choosing = true);
+                  try {
+                    await widget.onConfirm(entries);
+                  } finally {
+                    if (mounted) setState(() => _choosing = false);
+                  }
+                },
+          icon: const Icon(Icons.check),
+          label: const Text('Continuar al registro'),
+        ),
       ],
     );
   }
