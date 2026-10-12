@@ -1,3 +1,5 @@
+import '../features/meal_analysis/photo_analysis_page.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -58,6 +60,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             '/foods/create',
             '/profile/edit',
             '/meals/create',
+            '/analyze',
           }.contains(path)
           ? null
           : '/home';
@@ -112,6 +115,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
+      GoRoute(path: '/analyze', builder: (_, _) => const PhotoAnalysisPage()),
       GoRoute(path: '/home', builder: (_, _) => const HomePage()),
       GoRoute(path: '/account', builder: (_, _) => const AccountPage()),
       GoRoute(path: '/meals/create', builder: (_, _) => const CreateMealPage()),

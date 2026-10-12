@@ -242,8 +242,8 @@ class _HomePageState extends ConsumerState<HomePage>
                   const SizedBox(height: 16),
                 ],
                 _summary(),
-              const SizedBox(height: 20),
-              WaterCard(refresh: _revision),
+                const SizedBox(height: 20),
+                WaterCard(refresh: _revision),
                 const SizedBox(height: 24),
                 const Text(
                   'Registro de comidas',
@@ -252,10 +252,15 @@ class _HomePageState extends ConsumerState<HomePage>
                 const SizedBox(height: 10),
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    const photo = _HomeAction(
+                    final photo = _HomeAction(
                       icon: Icons.camera_alt_outlined,
                       title: 'Analizar comida',
+                      subtitle: 'Cámara o galería',
                       primary: true,
+                      onTap: () async {
+                        await context.push<bool>('/analyze');
+                        if (mounted) await _load();
+                      },
                     );
                     final manual = _HomeAction(
                       icon: Icons.edit_note,

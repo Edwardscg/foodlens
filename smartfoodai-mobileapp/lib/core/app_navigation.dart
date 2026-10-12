@@ -30,10 +30,10 @@ class AppNavigation extends StatelessWidget {
             selected: selected == '/history',
             onTap: () => context.go('/history'),
           ),
-          const _NavItem(
+          _NavItem(
             icon: Icons.camera_alt_outlined,
             label: 'Analizar',
-            disabled: true,
+            onTap: () => context.push('/analyze'),
           ),
           _NavItem(
             icon: Icons.person_outline,
