@@ -6,4 +6,5 @@ import java.time.Instant;
 
 public record CustomFoodResponse(Long id, String name, NutritionBasis basis,
                                  BigDecimal calories, BigDecimal proteinG,
-                                 BigDecimal carbsG, BigDecimal fatG, Instant createdAt) {}
+                                 BigDecimal carbsG, BigDecimal fatG, Instant createdAt,
+                                 Long sourceFdcId, Instant sourceImportedAt) {}

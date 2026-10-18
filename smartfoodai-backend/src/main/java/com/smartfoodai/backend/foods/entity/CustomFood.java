@@ -39,6 +39,11 @@ public class CustomFood {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "source_fdc_id", updatable = false)
+    private Long sourceFdcId;
+    @Column(name = "source_imported_at", updatable = false)
+    private Instant sourceImportedAt;
+
     @PrePersist
     void onCreate() { createdAt = Instant.now(); }
 }

@@ -25,6 +25,23 @@ public class CustomFoodService {
         return response(foods.save(food));
     }
 
+    @Transactional
+    public CustomFoodResponse importExternal(Long userId, String name, ExternalFoodDetail source) {
+        requireUser(userId);
+        if (name == null || name.isBlank() || name.length() > 120 || !source.complete()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST,
+                    "El alimento requiere un nombre válido y todos sus nutrientes. Puedes crearlo manualmente con datos completos.");
+        }
+        var food = new CustomFood();
+        food.setUserId(userId);
+        apply(food, new CreateCustomFoodRequest(name,
+                com.smartfoodai.backend.foods.entity.NutritionBasis.PER_100_G,
+                source.calories(), source.proteinG(), source.carbsG(), source.fatG()));
+        food.setSourceFdcId(source.fdcId());
+        food.setSourceImportedAt(java.time.Instant.now());
+        return response(foods.save(food));
+    }
+
     @Transactional(readOnly = true)
     public CustomFoodResponse get(Long userId, Long id) {
         return response(owned(userId, id));
@@ -83,6 +100,7 @@ public class CustomFoodService {
 
     private CustomFoodResponse response(CustomFood food) {
         return new CustomFoodResponse(food.getId(), food.getName(), food.getBasis(),
-                food.getCalories(), food.getProteinG(), food.getCarbsG(), food.getFatG(), food.getCreatedAt());
+                food.getCalories(), food.getProteinG(), food.getCarbsG(), food.getFatG(), food.getCreatedAt(),
+                food.getSourceFdcId(), food.getSourceImportedAt());
     }
 }
