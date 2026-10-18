@@ -58,25 +58,20 @@ class AppNavigation extends StatelessWidget {
 class _NavItem extends StatelessWidget {
   final IconData icon;
   final String label;
-  final bool selected, disabled;
+  final bool selected;
   final VoidCallback? onTap;
   const _NavItem({
     required this.icon,
     required this.label,
     this.selected = false,
-    this.disabled = false,
     this.onTap,
   });
   @override
   Widget build(BuildContext context) {
-    final color = disabled
-        ? const Color(0xFF99A29B)
-        : selected
-        ? AppTheme.green
-        : AppTheme.muted;
+    final color = selected ? AppTheme.green : AppTheme.muted;
     return Semantics(
       selected: selected,
-      enabled: !disabled,
+      enabled: onTap != null,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),

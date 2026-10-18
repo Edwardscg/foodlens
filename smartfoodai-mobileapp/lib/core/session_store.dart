@@ -14,7 +14,7 @@ class SessionStore {
 
   Future<T> _locked<T>(Future<T> Function() action) {
     final job = _tail.then((_) => action());
-    _tail = job.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    _tail = job.then<void>((_) {}, onError: (Object _, StackTrace _) {});
     return job;
   }
 

@@ -26,8 +26,9 @@ class ProfileApi {
       final fields = <String, String>{};
       if (data is Map && data['errors'] is Map) {
         (data['errors'] as Map).forEach((key, value) {
-          if (key is String && value is String)
+          if (key is String && value is String) {
             fields[key.replaceFirst(RegExp(r'^profile\.'), '')] = value;
+          }
         });
       }
       final message =
@@ -87,8 +88,9 @@ class ProfileApi {
     final profile = UserProfile.fromJson(
       Map<String, dynamic>.from(result.data as Map),
     );
-    if (!profile.completed)
+    if (!profile.completed) {
       throw const FormatException('Profile not completed');
+    }
     return profile;
   }, saving: true);
   void dispose() => _dio.close(force: true);

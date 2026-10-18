@@ -105,8 +105,9 @@ class _ExternalFoodPickerState extends State<ExternalFoodPicker> {
     if (_busy ||
         _uncertain ||
         _detail?.complete != true ||
-        !_form.currentState!.validate())
+        !_form.currentState!.validate()) {
       return;
+    }
     setState(() {
       _busy = true;
       _saving = true;
@@ -119,23 +120,26 @@ class _ExternalFoodPickerState extends State<ExternalFoodPicker> {
       );
       if (mounted) widget.onSelected(food);
     } on ApiFailure catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _error = error.message;
           _uncertain = error.status == null || error.status! >= 500;
         });
+      }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _uncertain = true;
           _error = 'No pudimos confirmar la importación. Revisa Mis alimentos.';
         });
+      }
     } finally {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _busy = false;
           _saving = false;
         });
+      }
     }
   }
 

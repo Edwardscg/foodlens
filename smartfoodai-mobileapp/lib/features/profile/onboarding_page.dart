@@ -112,21 +112,24 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       if (!mounted) return;
       setState(() {
         _suggestion = result;
-        if (result.available && !_manual)
+        if (result.available && !_manual) {
           _target.text = result.calories.toString();
+        }
         if (!result.available) _manual = true;
       });
     } on ApiFailure catch (failure) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _error = failure.message;
           _errors = failure.fields;
         });
+      }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => _error = 'No pudimos calcular la sugerencia. Puedes ingresar una meta manual.',
         );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -165,18 +168,20 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
         _errors = failure.fields;
         if (_errors.keys.any(
           (key) => {'age', 'sex', 'weightKg', 'heightCm', 'name'}.contains(key),
-        ))
+        )) {
           _step = 1;
-        else if (_errors.keys.any(
+        } else if (_errors.keys.any(
           (key) => {'activityLevel', 'goal'}.contains(key),
-        ))
+        )) {
           _step = 2;
+        }
       });
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => _error = 'No pudimos confirmar el guardado. Conservamos tus datos para reintentar.',
         );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }

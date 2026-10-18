@@ -53,8 +53,9 @@ class ProfileController extends ChangeNotifier {
     if (_disposed ||
         loading ||
         _owner == null ||
-        _auth.status != AuthStatus.signedIn)
+        _auth.status != AuthStatus.signedIn) {
       return;
+    }
     final revision = ++_revision;
     loading = true;
     error = null;
@@ -68,8 +69,9 @@ class ProfileController extends ChangeNotifier {
     } on ApiFailure catch (failure) {
       if (!_disposed && revision == _revision) error = failure.message;
     } catch (_) {
-      if (!_disposed && revision == _revision)
+      if (!_disposed && revision == _revision) {
         error = 'No pudimos recuperar tu perfil.';
+      }
     } finally {
       if (!_disposed && revision == _revision) {
         loading = false;
@@ -92,8 +94,9 @@ class ProfileController extends ChangeNotifier {
     final result = await _auth.withAccessToken(
       (token) => _api.save(token, data, suggested: suggested, target: target),
     );
-    if (_disposed || revision != _revision)
+    if (_disposed || revision != _revision) {
       throw const ApiFailure('La sesión cambió. Inténtalo nuevamente.');
+    }
     profile = result;
     error = null;
     _notify();

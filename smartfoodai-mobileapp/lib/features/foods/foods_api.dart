@@ -146,8 +146,9 @@ class FoodsApi {
           final result = ExternalFoodPage.fromJson(
             Map<String, dynamic>.from(response.data as Map),
           );
-          if (result.page != page)
+          if (result.page != page) {
             throw const FormatException('Unexpected page');
+          }
           return result;
         }),
         retryUnauthorized: true,

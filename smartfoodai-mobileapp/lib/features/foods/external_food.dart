@@ -57,8 +57,9 @@ class ExternalFoodPage {
         page is! int ||
         page < 0 ||
         pages is! int ||
-        pages < 0)
+        pages < 0) {
       throw const FormatException('Invalid external page');
+    }
     return ExternalFoodPage(
       List.unmodifiable(
         items.map(

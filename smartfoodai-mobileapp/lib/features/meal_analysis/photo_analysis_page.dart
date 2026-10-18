@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:dio/dio.dart';
@@ -346,14 +345,16 @@ class _PhotoAnalysisPageState extends ConsumerState<PhotoAnalysisPage> {
                   onPressed: _busy
                       ? null
                       : () async {
-                          if (!await _confirmDiscard() || !context.mounted)
+                          if (!await _confirmDiscard() || !context.mounted) {
                             return;
+                          }
                           setState(() => _foods = null);
                           final saved = await context.push<bool>(
                             '/meals/create',
                           );
-                          if (context.mounted && saved == true)
+                          if (context.mounted && saved == true) {
                             context.pop(true);
+                          }
                         },
                   child: const Text('Registrar manualmente'),
                 ),
