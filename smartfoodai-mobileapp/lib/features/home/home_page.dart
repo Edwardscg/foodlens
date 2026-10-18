@@ -305,7 +305,10 @@ class _HomePageState extends ConsumerState<HomePage>
           ),
         ),
       ),
-      bottomNavigationBar: const AppNavigation(selected: '/home'),
+      bottomNavigationBar: AppNavigation(
+        selected: '/home',
+        onAnalysisReturn: _load,
+      ),
     );
   }
 

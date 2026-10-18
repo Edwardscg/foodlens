@@ -215,7 +215,10 @@ class _MealHistoryScreenState extends ConsumerState<MealHistoryScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: const AppNavigation(selected: '/history'),
+      bottomNavigationBar: AppNavigation(
+        selected: '/history',
+        onAnalysisReturn: () => _load(reset: true),
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 520),

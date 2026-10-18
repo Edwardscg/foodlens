@@ -5,7 +5,12 @@ import 'app_theme.dart';
 
 class AppNavigation extends StatelessWidget {
   final String selected;
-  const AppNavigation({super.key, required this.selected});
+  final Future<void> Function() onAnalysisReturn;
+  const AppNavigation({
+    super.key,
+    required this.selected,
+    required this.onAnalysisReturn,
+  });
   @override
   Widget build(BuildContext context) => SafeArea(
     top: false,
@@ -33,7 +38,10 @@ class AppNavigation extends StatelessWidget {
           _NavItem(
             icon: Icons.camera_alt_outlined,
             label: 'Analizar',
-            onTap: () => context.push('/analyze'),
+            onTap: () async {
+              await context.push<bool>('/analyze');
+              if (context.mounted) await onAnalysisReturn();
+            },
           ),
           _NavItem(
             icon: Icons.person_outline,
