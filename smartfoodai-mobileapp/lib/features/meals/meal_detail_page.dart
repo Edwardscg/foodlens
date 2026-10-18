@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -59,13 +60,14 @@ class _MealDetailPageState extends ConsumerState<MealDetailPage> {
       _meal = null;
       _photo = null;
       _photoError = null;
+      _loadingPhoto = false;
       _unavailable = false;
     });
     try {
       final meal = await _api.get(widget.mealId);
       if (mounted && revision == _revision) {
         setState(() => _meal = meal);
-        if (meal.summary.origin == 'PHOTO') await _loadPhoto(revision);
+        if (meal.summary.origin == 'PHOTO') unawaited(_loadPhoto(revision));
       }
     } on ApiFailure catch (error) {
       if (mounted && revision == _revision) {
@@ -92,11 +94,20 @@ class _MealDetailPageState extends ConsumerState<MealDetailPage> {
       final image = await _api.photo(widget.mealId);
       if (mounted && revision == _revision) setState(() => _photo = image);
     } on ApiFailure catch (error) {
-      if (mounted && revision == _revision)
+      if (mounted && revision == _revision) {
         setState(() => _photoError = error.message);
+      }
+    } catch (_) {
+      if (mounted && revision == _revision) {
+        setState(
+          () =>
+              _photoError = 'No pudimos cargar la foto. Inténtalo nuevamente.',
+        );
+      }
     } finally {
-      if (mounted && revision == _revision)
+      if (mounted && revision == _revision) {
         setState(() => _loadingPhoto = false);
+      }
     }
   }
 
