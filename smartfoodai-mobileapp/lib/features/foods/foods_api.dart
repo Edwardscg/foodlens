@@ -4,6 +4,7 @@ import '../../core/api_config.dart';
 import '../auth/auth_controller.dart';
 import '../auth/auth_models.dart';
 import 'food_models.dart';
+import 'external_food.dart';
 
 class FoodsApi {
   final AuthController auth;
@@ -128,6 +129,64 @@ class FoodsApi {
       writeFailure: 'No pudimos confirmar la eliminación. Actualiza Mis alimentos para comprobar si sigue disponible.',
     ),
   );
+
+  String get _external => '${ApiConfig.origin}/api/foods/external';
+
+  Future<ExternalFoodPage> searchExternal(String query, int page) =>
+      auth.withAccessToken(
+        (token) => _call(() async {
+          final response = await _dio.get<dynamic>(
+            _external,
+            queryParameters: {'query': query, 'page': page},
+            options: Options(
+              receiveTimeout: const Duration(seconds: 25),
+              headers: {'Authorization': 'Bearer $token'},
+            ),
+          );
+          final result = ExternalFoodPage.fromJson(
+            Map<String, dynamic>.from(response.data as Map),
+          );
+          if (result.page != page)
+            throw const FormatException('Unexpected page');
+          return result;
+        }),
+        retryUnauthorized: true,
+      );
+
+  Future<ExternalFood> externalDetail(int id) => auth.withAccessToken(
+    (token) => _call(() async {
+      final response = await _dio.get<dynamic>(
+        '$_external/$id',
+        options: Options(
+          receiveTimeout: const Duration(seconds: 25),
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+      final food = ExternalFood.fromJson(
+        Map<String, dynamic>.from(response.data as Map),
+      );
+      if (food.id != id) throw const FormatException('Unexpected food');
+      return food;
+    }),
+    retryUnauthorized: true,
+  );
+
+  Future<CustomFood> importExternal(int id, String name) =>
+      auth.withAccessToken(
+        (token) => _call(() async {
+          final response = await _dio.post<dynamic>(
+            '$_external/$id/import',
+            data: {'name': name},
+            options: Options(
+              receiveTimeout: const Duration(seconds: 25),
+              headers: {'Authorization': 'Bearer $token'},
+            ),
+          );
+          return CustomFood.fromJson(
+            Map<String, dynamic>.from(response.data as Map),
+          );
+        }, writeFailure: _uncertainSave),
+      );
 
   void dispose() => _dio.close(force: true);
 }
