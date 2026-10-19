@@ -25,7 +25,7 @@ spring:
     hibernate:
       # "validate": Hibernate compara las entidades contra las tablas que ya
       # existen en Railway y falla claramente al arrancar si no coinciden.
-      ddl-auto: validate
+      ddl-auto: update
     open-in-view: false
 
 app:
