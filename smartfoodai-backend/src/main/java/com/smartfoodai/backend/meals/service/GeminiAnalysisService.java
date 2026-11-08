@@ -4,6 +4,7 @@ import com.smartfoodai.backend.common.exception.ApiException;
 import com.smartfoodai.backend.meals.dto.PhotoAnalysisResponse;
 import com.smartfoodai.backend.meals.dto.PhotoAnalysisResponse.DetectedFood;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class GeminiAnalysisService {
@@ -31,6 +33,23 @@ public class GeminiAnalysisService {
     private final Set<Long> active = new HashSet<>();
 
     public PhotoAnalysisResponse analyze(Long userId, MultipartFile image) {
+        String diagnosticId = UUID.randomUUID().toString();
+        long started = System.nanoTime();
+        log.info("photo-analysis id={} event=received", diagnosticId);
+        try {
+            var result = analyzeRequest(userId, image, diagnosticId);
+            log.info("photo-analysis id={} event=success", diagnosticId);
+            return result;
+        } catch (ApiException exception) {
+            log.warn("photo-analysis id={} event=rejected http={}", diagnosticId, exception.getStatus().value());
+            throw exception;
+        } finally {
+            log.info("photo-analysis id={} event=finished elapsedMs={}", diagnosticId,
+                    TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
+        }
+    }
+
+    private PhotoAnalysisResponse analyzeRequest(Long userId, MultipartFile image, String diagnosticId) {
         if (userId == null) throw new ApiException(HttpStatus.UNAUTHORIZED, "Inicia sesión para continuar.");
         if (apiKey == null || apiKey.isBlank() || model == null || !model.matches("[a-zA-Z0-9][a-zA-Z0-9.-]{0,99}")) {
             throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE, "El análisis de fotos todavía no está disponible.");
@@ -55,21 +74,35 @@ public class GeminiAnalysisService {
             var request = HttpRequest.newBuilder(URI.create(endpoint + model + ":generateContent"))
                     .timeout(Duration.ofSeconds(45)).header("Content-Type", "application/json")
                     .header("x-goog-api-key", apiKey).POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build();
+            log.info("photo-analysis id={} event=gemini-request", diagnosticId);
             var pending = http.sendAsync(request, HttpResponse.BodyHandlers.ofString());
             try {
                 var response = pending.get(45, TimeUnit.SECONDS);
+                log.info("photo-analysis id={} event=gemini-response http={}", diagnosticId, response.statusCode());
                 if (response.statusCode() == 429) throw new ApiException(HttpStatus.TOO_MANY_REQUESTS,
                         "El análisis está ocupado. Espera un momento o usa registro manual.");
                 if (response.statusCode() != 200 || response.body().length() > 262144) throw unavailable();
-                return parse(response.body());
+                try {
+                    return parse(response.body());
+                } catch (RuntimeException exception) {
+                    log.warn("photo-analysis id={} event=invalid-provider-response", diagnosticId);
+                    throw exception;
+                }
             } catch (InterruptedException exception) {
+                log.warn("photo-analysis id={} event=interrupted", diagnosticId);
                 Thread.currentThread().interrupt();
                 throw unavailable();
             } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException exception) {
+                Throwable cause = exception.getCause() == null ? exception : exception.getCause();
+                // Only the exception type: messages can contain provider URLs or credentials.
+                log.warn("photo-analysis id={} event=transport-failure type={}", diagnosticId, cause.getClass().getSimpleName());
                 throw unavailable();
             } finally { if (!pending.isDone()) pending.cancel(true); }
         } catch (ApiException exception) { throw exception; }
-        catch (RuntimeException exception) { throw unavailable(); }
+        catch (RuntimeException exception) {
+            log.warn("photo-analysis id={} event=processing-failure type={}", diagnosticId, exception.getClass().getSimpleName());
+            throw unavailable();
+        }
         finally { release(userId); }
     }
 
