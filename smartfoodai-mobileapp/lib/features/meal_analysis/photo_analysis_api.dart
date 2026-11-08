@@ -28,6 +28,11 @@ class PhotoAnalysisApi {
   ) => auth.withAccessToken((token) async {
     try {
       if (cancel.isCancelled) throw cancel.cancelError!;
+      if (kDebugMode) {
+        debugPrint(
+          'photo-analysis event=sending destination=${_dio.options.baseUrl}/analyze',
+        );
+      }
       final response = await _dio.post<dynamic>(
         '/analyze',
         options: Options(headers: {'Authorization': 'Bearer $token'}),
@@ -39,6 +44,11 @@ class PhotoAnalysisApi {
       return DetectedFood.parseResponse(response.data);
     } on DioException catch (error) {
       if (CancelToken.isCancel(error)) rethrow;
+      if (kDebugMode) {
+        debugPrint(
+          'photo-analysis event=failure type=${error.type.name} http=${error.response?.statusCode}',
+        );
+      }
       final status = error.response?.statusCode;
       final data = error.response?.data;
       throw ApiFailure(
