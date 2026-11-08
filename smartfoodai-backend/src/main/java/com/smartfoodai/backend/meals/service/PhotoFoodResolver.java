@@ -10,6 +10,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import java.util.*;
+import com.smartfoodai.backend.foods.service.FoodNameMatcher;
+import com.smartfoodai.backend.foods.entity.CustomFood;
+import com.smartfoodai.backend.foods.dto.ExternalFoodPage;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -28,12 +33,35 @@ public class PhotoFoodResolver {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Revisa entre 1 y 20 alimentos.");
         }
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(75);
+        var catalog = new ArrayList<CustomFood>();
+        int page = 0;
+        org.springframework.data.domain.Page<CustomFood> batch;
+        do {
+            batch = foods.findByUserId(userId, PageRequest.of(page++, 200, Sort.by("id")));
+            catalog.addAll(batch.getContent());
+        } while (batch.hasNext());
+        var privateGroups = new ArrayList<GeminiAnalysisService.MatchRequest>();
+        for (int i = 0; i < requests.size(); i++) {
+            var request = requests.get(i);
+            if (!FoodNameMatcher.exact(catalog, request.name()).isEmpty()) continue;
+            var options = FoodNameMatcher.candidates(catalog, request.name(), request.nutritionQuery());
+            if (!options.isEmpty()) privateGroups.add(new GeminiAnalysisService.MatchRequest(i, request.name(),
+                request.nutritionQuery() == null ? request.name() : request.nutritionQuery(),
+                options.stream().map(food -> new ExternalFoodPage.Item(food.getId(), food.getName(), "USER_PRIVATE")).toList()));
+        }
+        Map<Integer, Long> privateMatches;
+        try { privateMatches = matcher.matchNutrition(privateGroups); }
+        catch (ApiException exception) { privateMatches = Map.of(); }
         var result = new ArrayList<Resolution>();
         var groups = new ArrayList<GeminiAnalysisService.MatchRequest>();
         for (int i = 0; i < requests.size(); i++) {
             var request = requests.get(i);
             result.add(unresolved("No encontramos una coincidencia nutricional completa. Puedes elegir o crear el alimento."));
-            var own = foods.findTop2ByUserIdAndNameIgnoreCase(userId, request.name().strip());
+            var own = FoodNameMatcher.exact(catalog, request.name());
+            if (own.isEmpty() && privateMatches.containsKey(i)) {
+                Long selectedId = privateMatches.get(i);
+                own = catalog.stream().filter(food -> food.getId().equals(selectedId)).toList();
+            }
             if (own.size() > 1) continue;
             if (own.size() == 1) {
                 var food = own.getFirst();
