@@ -3,13 +3,15 @@ import '../meals/meal_models.dart';
 import 'detected_food.dart';
 
 class ReviewFood {
+  final DetectedFood detection;
   final String detectedName;
   final double? estimatedGrams;
   CustomFood? food;
   String quantity = '';
 
   ReviewFood(DetectedFood detected)
-    : detectedName = detected.name,
+    : detection = detected,
+      detectedName = detected.name,
       estimatedGrams = detected.estimatedGrams;
 
   void select(CustomFood selected) {

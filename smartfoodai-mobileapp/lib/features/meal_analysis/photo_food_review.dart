@@ -140,6 +140,16 @@ class _PhotoFoodReviewState extends ConsumerState<PhotoFoodReview> {
                   ),
                   if (item.detectedName.isNotEmpty)
                     Text('Detectado: ${item.detectedName}'),
+                  if (item.detectedName.isNotEmpty) ...[
+                    Text(
+                      'Confianza de identificación original: ${item.detection.confidenceLabel}',
+                    ),
+                    if (item.detection.confidenceReason != null)
+                      Text(item.detection.confidenceReason!),
+                    const Text(
+                      'Valoración orientativa del modelo; revisa el alimento y la cantidad.',
+                    ),
+                  ],
                   if (item.estimatedGrams != null)
                     Text(
                       'Estimación de la foto: ${foodNumber(item.estimatedGrams!)} g',

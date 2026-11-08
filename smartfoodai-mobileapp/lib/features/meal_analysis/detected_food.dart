@@ -1,7 +1,19 @@
 class DetectedFood {
   final String name;
   final double? estimatedGrams;
-  const DetectedFood(this.name, this.estimatedGrams);
+  final String? confidence, confidenceReason;
+  const DetectedFood(
+    this.name,
+    this.estimatedGrams, {
+    this.confidence,
+    this.confidenceReason,
+  });
+  String get confidenceLabel => switch (confidence) {
+    'HIGH' => 'Alta',
+    'MEDIUM' => 'Media',
+    'LOW' => 'Baja',
+    _ => 'No informada',
+  };
 
   static List<DetectedFood> parseResponse(dynamic data) {
     if (data is! Map || data['foods'] is! List) {
@@ -27,7 +39,22 @@ class DetectedFood {
                     grams > 10000))) {
           throw const FormatException('Invalid food');
         }
-        return DetectedFood(name, (grams as num?)?.toDouble());
+        final confidence = item['confidence'],
+            reason = item['confidenceReason'];
+        // Older servers may omit both; never infer confidence from quantity.
+        if ((confidence != null || reason != null) &&
+            (!{'HIGH', 'MEDIUM', 'LOW'}.contains(confidence) ||
+                reason is! String ||
+                reason.trim().isEmpty ||
+                reason.length > 200)) {
+          throw const FormatException('Invalid confidence');
+        }
+        return DetectedFood(
+          name,
+          (grams as num?)?.toDouble(),
+          confidence: confidence as String?,
+          confidenceReason: reason as String?,
+        );
       }),
     );
   }
