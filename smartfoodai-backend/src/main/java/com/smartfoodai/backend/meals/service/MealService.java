@@ -30,6 +30,8 @@ import java.util.List;
 public class MealService {
     private final MealRepository meals;
     private final CustomFoodRepository foods;
+    private final com.smartfoodai.backend.foods.service.UsdaFoodService usda;
+    private final com.smartfoodai.backend.foods.service.CustomFoodService customFoods;
 
     @Transactional
     public MealResponse create(Long userId, CreateMealRequest request) {
@@ -145,7 +147,14 @@ public class MealService {
     }
 
     private MealItem newItem(Long userId, Meal meal, CreateMealRequest.Item input) {
-        CustomFood food = foods.findByIdAndUserId(input.foodId(), userId)
+        if (!input.isSourceValid()) throw new ApiException(HttpStatus.BAD_REQUEST, "Selecciona una fuente de alimento válida.");
+        Long foodId = input.foodId();
+        if (input.externalFdcId() != null) {
+            // Only confirmation writes a private food; the surrounding meal transaction rolls it back on failure.
+            var detail = usda.detail(userId, input.externalFdcId());
+            foodId = customFoods.importExternal(userId, input.externalName(), detail).id();
+        }
+        CustomFood food = foods.findByIdAndUserId(foodId, userId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "Alimento no disponible."));
         MealUnit expected = food.getBasis() == NutritionBasis.PER_100_G
                 ? MealUnit.GRAMS : MealUnit.SERVINGS;

@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
+
+import '../auth/auth_models.dart';
+import 'photo_analysis_api.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,10 +18,12 @@ import 'review_food.dart';
 
 class PhotoFoodReview extends ConsumerStatefulWidget {
   final List<DetectedFood> detected;
+  final bool canConfirm;
   final Future<void> Function(List<MealEntry>) onConfirm;
   const PhotoFoodReview({
     super.key,
     required this.detected,
+    this.canConfirm = true,
     required this.onConfirm,
   });
   @override
@@ -26,23 +33,61 @@ class PhotoFoodReview extends ConsumerStatefulWidget {
 class _PhotoFoodReviewState extends ConsumerState<PhotoFoodReview> {
   late final FoodsApi _api;
   late final List<ReviewFood> _items;
-  bool _choosing = false;
+  bool _choosing = false, _resolving = true;
+  late final PhotoAnalysisApi _resolver;
+  final _resolutionCancel = CancelToken();
+  bool get _busy => _choosing || _resolving;
+
+  Future<void> _resolveAll() async {
+    try {
+      if (_items.isEmpty) return;
+      final results = await _resolver.resolveAll(
+        widget.detected,
+        _resolutionCancel,
+      );
+      if (!mounted) return;
+      setState(() {
+        for (var i = 0; i < _items.length; i++) {
+          final selected = results[i].food;
+          if (selected != null) {
+            _items[i].select(selected);
+          } else {
+            _items[i].resolutionError = results[i].issue ?? 'Sin coincidencia nutricional completa. Elige o crea el alimento.';
+          }
+        }
+      });
+    } catch (error) {
+      if (mounted && !_resolutionCancel.isCancelled) {
+        setState(() {
+          for (final item in _items) {
+            item.resolutionError = error is ApiFailure ? error.message : 'No pudimos vincular los alimentos. Puedes elegirlos manualmente.';
+          }
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _resolving = false);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _api = FoodsApi(ref.read(authProvider));
     _items = widget.detected.map(ReviewFood.new).toList();
+    _resolver = PhotoAnalysisApi(ref.read(authProvider));
+    _resolveAll();
   }
 
   @override
   void dispose() {
+    _resolutionCancel.cancel();
+    _resolver.close();
     _api.dispose();
     super.dispose();
   }
 
   Future<void> _choose([ReviewFood? item]) async {
-    if (_choosing || (item == null && _items.length >= 50)) return;
+    if (_busy || (item == null && _items.length >= 50)) return;
     setState(() => _choosing = true);
     try {
       while (mounted) {
@@ -91,9 +136,14 @@ class _PhotoFoodReviewState extends ConsumerState<PhotoFoodReview> {
         ),
         const SizedBox(height: 8),
         const Text(
-          'Elige el alimento correspondiente de Mis alimentos y revisa la cantidad. Puedes crear uno si no está en tu catálogo.',
+          'Revisa los alimentos vinculados y ajusta las cantidades estimadas antes de guardar.',
         ),
         const SizedBox(height: 16),
+        if (_resolving) ...[
+          const LinearProgressIndicator(),
+          const SizedBox(height: 8),
+          const Text('Buscando coincidencias nutricionales…'),
+        ],
         if (complete)
           Card(
             child: Padding(
@@ -105,8 +155,15 @@ class _PhotoFoodReviewState extends ConsumerState<PhotoFoodReview> {
                     '${foodNumber(total((food) => food.calories))} kcal',
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
+                  if (entries.every(
+                    (entry) => entry.food.basis == NutritionBasis.per100g,
+                  ))
+                    Text(
+                      'Total ración: ${foodNumber(entries.fold<double>(0, (sum, entry) => sum + entry.quantity))} g',
+                    ),
                   const SizedBox(height: 12),
                   MacroSummary(
+                    energyDistribution: true,
                     carbs: total((food) => food.carbsG),
                     protein: total((food) => food.proteinG),
                     fat: total((food) => food.fatG),
@@ -139,35 +196,74 @@ class _PhotoFoodReviewState extends ConsumerState<PhotoFoodReview> {
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   if (item.detectedName.isNotEmpty)
-                    Text('Detectado: ${item.detectedName}'),
-                  if (item.detectedName.isNotEmpty) ...[
-                    Text(
-                      'Confianza de identificación original: ${item.detection.confidenceLabel}',
+                    ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      title: Text(
+                        'Confianza ${item.detection.confidenceLabel.toLowerCase()}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      children: [
+                        if (item.detection.confidenceReason != null)
+                          Text(item.detection.confidenceReason!),
+                        const Text(
+                          'Valoración orientativa de la identificación original; revisa el alimento y la cantidad.',
+                        ),
+                        if (item.food?.sourceName != null)
+                          Text(
+                            'Referencia nutricional: ${item.food!.sourceName}',
+                          ),
+                      ],
                     ),
-                    if (item.detection.confidenceReason != null)
-                      Text(item.detection.confidenceReason!),
-                    const Text(
-                      'Valoración orientativa del modelo; revisa el alimento y la cantidad.',
+                  if (item.resolutionError != null) Text(item.resolutionError!),
+                  if (item.entry != null) ...[
+                    Text(
+                      '${foodNumber(item.entry!.scaled(item.food!.calories))} kcal',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    Text(
+                      'C: ${foodNumber(item.entry!.scaled(item.food!.carbsG))} g · '
+                      'P: ${foodNumber(item.entry!.scaled(item.food!.proteinG))} g · '
+                      'G: ${foodNumber(item.entry!.scaled(item.food!.fatG))} g',
                     ),
                   ],
-                  if (item.estimatedGrams != null)
-                    Text(
-                      'Estimación de la foto: ${foodNumber(item.estimatedGrams!)} g',
-                    ),
-                  if (item.food == null)
-                    const Text('Información nutricional pendiente'),
                   if (item.food != null) ...[
                     const SizedBox(height: 12),
                     TextFormField(
-                      key: ValueKey(item.food!.id),
+                      key: ValueKey(item.quantityRevision),
                       initialValue: item.quantity,
-                      enabled: !_choosing,
+                      enabled: !_busy,
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
                       autovalidateMode: AutovalidateMode.onUserInteraction,
                       decoration: InputDecoration(
-                        labelText: 'Cantidad',
+                        labelText: 'Cantidad editable',
+                        prefixIcon: IconButton(
+                          tooltip: 'Reducir cantidad',
+                          onPressed: _busy
+                              ? null
+                              : () => setState(
+                                  () => item.adjust(
+                                    item.food!.basis == NutritionBasis.per100g
+                                        ? -10
+                                        : -1,
+                                  ),
+                                ),
+                          icon: const Icon(Icons.remove),
+                        ),
+                        suffixIcon: IconButton(
+                          tooltip: 'Aumentar cantidad',
+                          onPressed: _busy
+                              ? null
+                              : () => setState(
+                                  () => item.adjust(
+                                    item.food!.basis == NutritionBasis.per100g
+                                        ? 10
+                                        : 1,
+                                  ),
+                                ),
+                          icon: const Icon(Icons.add),
+                        ),
                         suffixText: item.food!.basis == NutritionBasis.per100g
                             ? 'g'
                             : 'porciones',
@@ -183,7 +279,7 @@ class _PhotoFoodReviewState extends ConsumerState<PhotoFoodReview> {
                     spacing: 8,
                     children: [
                       TextButton.icon(
-                        onPressed: _choosing ? null : () => _choose(item),
+                        onPressed: _busy ? null : () => _choose(item),
                         icon: const Icon(Icons.search),
                         label: Text(
                           item.food == null
@@ -192,7 +288,7 @@ class _PhotoFoodReviewState extends ConsumerState<PhotoFoodReview> {
                         ),
                       ),
                       TextButton.icon(
-                        onPressed: _choosing
+                        onPressed: _busy
                             ? null
                             : () => setState(() => _items.remove(item)),
                         icon: const Icon(Icons.delete_outline),
@@ -205,13 +301,13 @@ class _PhotoFoodReviewState extends ConsumerState<PhotoFoodReview> {
             ),
           ),
         OutlinedButton.icon(
-          onPressed: _choosing || _items.length >= 50 ? null : () => _choose(),
+          onPressed: _busy || _items.length >= 50 ? null : () => _choose(),
           icon: const Icon(Icons.add),
           label: const Text('Añadir alimento'),
         ),
         const SizedBox(height: 16),
         FilledButton.icon(
-          onPressed: !complete || _choosing
+          onPressed: !complete || _busy || !widget.canConfirm
               ? null
               : () async {
                   setState(() => _choosing = true);
@@ -222,7 +318,7 @@ class _PhotoFoodReviewState extends ConsumerState<PhotoFoodReview> {
                   }
                 },
           icon: const Icon(Icons.check),
-          label: const Text('Continuar al registro'),
+          label: const Text('Guardar comida'),
         ),
       ],
     );

@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
@@ -7,6 +5,7 @@ import '../../core/api_config.dart';
 import '../auth/auth_controller.dart';
 import '../auth/auth_models.dart';
 import 'detected_food.dart';
+import '../foods/food_models.dart';
 
 class PhotoAnalysisApi {
   final AuthController auth;
@@ -19,6 +18,68 @@ class PhotoAnalysisApi {
     ),
   );
   PhotoAnalysisApi(this.auth);
+
+  Future<List<({CustomFood? food, String? issue})>> resolveAll(
+    List<DetectedFood> items,
+    CancelToken cancel,
+  ) => auth.withAccessToken((token) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/resolve-foods',
+        data: items
+            .map(
+              (item) => {
+                'name': item.name,
+                'nutritionQuery': item.nutritionQuery,
+              },
+            )
+            .toList(),
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          receiveTimeout: const Duration(seconds: 120),
+        ),
+        cancelToken: cancel,
+      );
+      final data = response.data;
+      if (data is! List || data.length != items.length) {
+        throw const FormatException('Invalid resolution');
+      }
+      return data.map<({CustomFood? food, String? issue})>((row) {
+        if (row is! Map) throw const FormatException('Invalid resolution');
+        if (row['food'] == null) {
+          return (food: null, issue: row['issue'] as String?);
+        }
+        final food = CustomFood.fromJson(
+          Map<String, dynamic>.from(row['food'] as Map),
+        );
+        final external = row['externalFdcId'];
+        if (external != null &&
+            (external is! int || external <= 0 || external != food.id)) {
+          throw const FormatException('Invalid external reference');
+        }
+        return (
+          food: CustomFood(
+            id: food.id,
+            name: food.name,
+            basis: food.basis,
+            calories: food.calories,
+            proteinG: food.proteinG,
+            carbsG: food.carbsG,
+            fatG: food.fatG,
+            externalFdcId: external as int?,
+            sourceName: row['sourceName'] as String?,
+          ),
+          issue: null,
+        );
+      }).toList();
+    } on DioException catch (error) {
+      if (CancelToken.isCancel(error)) rethrow;
+      throw ApiFailure(
+        'No pudimos consultar la base nutricional. Puedes elegir los alimentos manualmente.',
+        status: error.response?.statusCode,
+      );
+    }
+  });
 
   void close() => _dio.close(force: true);
 

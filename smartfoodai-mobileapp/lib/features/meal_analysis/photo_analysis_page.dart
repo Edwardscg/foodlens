@@ -13,7 +13,8 @@ import '../auth/auth_models.dart';
 import 'detected_food.dart';
 import 'photo_analysis_api.dart';
 import 'photo_food_review.dart';
-import 'photo_meal_draft.dart';
+import '../meals/meals_api.dart';
+import '../meals/meal_models.dart';
 
 class PhotoAnalysisPage extends ConsumerStatefulWidget {
   const PhotoAnalysisPage({super.key});
@@ -27,15 +28,19 @@ class _PhotoAnalysisPageState extends ConsumerState<PhotoAnalysisPage> {
   Uint8List? _image;
   List<DetectedFood>? _foods;
   String? _message;
-  bool _picking = true;
+  bool _picking = true, _saving = false, _uncertainSave = false;
+  late final MealsApi _meals;
+  MealType _mealType = MealType.lunch;
+  DateTime _consumedAt = DateTime.now();
   bool _allowExit = false, _confirming = false;
   CancelToken? _request;
-  bool get _busy => _picking || _request != null;
+  bool get _busy => _picking || _request != null || _saving;
 
   @override
   void initState() {
     super.initState();
     _api = PhotoAnalysisApi(ref.read(authProvider));
+    _meals = MealsApi(ref.read(authProvider));
     _checkInterruptedSelection();
   }
 
@@ -60,6 +65,7 @@ class _PhotoAnalysisPageState extends ConsumerState<PhotoAnalysisPage> {
   void dispose() {
     _request?.cancel();
     _api.close();
+    _meals.dispose();
     _image = null;
     super.dispose();
   }
@@ -181,6 +187,7 @@ class _PhotoAnalysisPageState extends ConsumerState<PhotoAnalysisPage> {
   }
 
   Future<bool> _confirmDiscard() async {
+    if (_saving) return false;
     if (_foods == null) return true;
     if (_confirming) return false;
     _confirming = true;
@@ -210,6 +217,83 @@ class _PhotoAnalysisPageState extends ConsumerState<PhotoAnalysisPage> {
     }
   }
 
+  Future<void> _savePhoto(List<MealEntry> entries) async {
+    if (_saving || _uncertainSave || _image == null) return;
+    setState(() {
+      _saving = true;
+      _message = null;
+    });
+    bool submitted = false;
+    try {
+      final zone = await const MethodChannel('smartfoodai/timezone')
+          .invokeMethod<String>('getTimeZone');
+      if (zone == null || zone.isEmpty) {
+        throw const ApiFailure(
+          'No pudimos leer la zona horaria. Inténtalo nuevamente.',
+        );
+      }
+      if (_consumedAt.isAfter(DateTime.now())) {
+        throw const ApiFailure('La fecha y hora no pueden estar en el futuro.');
+      }
+      submitted = true;
+      await _meals.create(_mealType, _consumedAt, zone, entries, image: _image);
+      if (!mounted) return;
+      setState(() => _allowExit = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (context.canPop()) {
+          context.pop(true);
+        } else {
+          context.go('/home');
+        }
+      });
+    } on MealSaveFailure catch (error) {
+      if (mounted) {
+        setState(() {
+          _message = error.message;
+          _uncertainSave = error.uncertain;
+        });
+      }
+    } on ApiFailure catch (error) {
+      if (mounted) setState(() => _message = error.message);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _message = submitted
+              ? 'No pudimos confirmar el guardado. Revisa el historial antes de repetirlo.'
+              : 'No pudimos preparar el registro. Inténtalo nuevamente.';
+          _uncertainSave = submitted;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _editWhen() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _consumedAt,
+      firstDate: DateTime(1970),
+      lastDate: DateTime.now(),
+    );
+    if (!mounted || date == null) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_consumedAt),
+    );
+    if (!mounted || time == null) return;
+    setState(
+      () => _consumedAt = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      ),
+    );
+  }
+
   Future<void> _leave() async {
     if (!await _confirmDiscard() || !mounted) return;
     setState(() => _allowExit = true);
@@ -231,7 +315,7 @@ class _PhotoAnalysisPageState extends ConsumerState<PhotoAnalysisPage> {
     },
     child: Scaffold(
       appBar: AppBar(
-        title: const Text('Analizar comida'),
+        title: Text(_foods == null ? 'Analizar comida' : 'Revisar alimentos'),
         leading: IconButton(
           onPressed: _leave,
           tooltip: 'Volver',
@@ -246,20 +330,25 @@ class _PhotoAnalysisPageState extends ConsumerState<PhotoAnalysisPage> {
               padding: const EdgeInsets.all(24),
               children: [
                 Text(
-                  _image == null ? 'Añadir una foto' : 'Revisa tu foto',
+                  _foods != null
+                      ? 'Visión asistida · ${_foods!.length} detectados'
+                      : _image == null
+                      ? 'Añadir una foto'
+                      : 'Revisa tu foto',
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 12),
-                const Text(
-                  'Centra el plato y usa buena iluminación. La foto se enviará para analizarla solo cuando pulses Analizar.',
-                ),
+                if (_foods == null)
+                  const Text(
+                    'Centra el plato y usa buena iluminación. La foto se enviará para analizarla solo cuando pulses Analizar.',
+                  ),
                 const SizedBox(height: 20),
                 if (_image != null) ...[
                   ClipRRect(
                     borderRadius: BorderRadius.circular(16),
                     child: Image.memory(
                       _image!,
-                      height: 260,
+                      height: _foods == null ? 260 : 96,
                       fit: BoxFit.contain,
                       cacheWidth: 1000,
                       semanticLabel: 'Foto seleccionada para analizar',
@@ -278,7 +367,11 @@ class _PhotoAnalysisPageState extends ConsumerState<PhotoAnalysisPage> {
                   const Center(child: CircularProgressIndicator()),
                   const SizedBox(height: 12),
                   Text(
-                    _picking ? 'Preparando selección…' : 'Analizando tu foto…',
+                    _saving
+                        ? 'Guardando comida…'
+                        : _picking
+                        ? 'Preparando selección…'
+                        : 'Analizando tu foto…',
                     textAlign: TextAlign.center,
                   ),
                   if (_request != null)
@@ -289,6 +382,40 @@ class _PhotoAnalysisPageState extends ConsumerState<PhotoAnalysisPage> {
                   const SizedBox(height: 16),
                 ],
                 if (_foods != null) ...[
+                  DropdownButtonFormField<MealType>(
+                    initialValue: _mealType,
+                    decoration: const InputDecoration(
+                      labelText: 'Tipo de comida',
+                    ),
+                    items: MealType.values
+                        .map(
+                          (type) => DropdownMenuItem(
+                            value: type,
+                            child: Text(type.label),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: _busy || _uncertainSave
+                        ? null
+                        : (value) {
+                            if (value != null) {
+                              setState(() => _mealType = value);
+                            }
+                          },
+                  ),
+                  TextButton.icon(
+                    onPressed: _busy || _uncertainSave ? null : _editWhen,
+                    icon: const Icon(Icons.schedule),
+                    label: Text(
+                      '${MaterialLocalizations.of(context).formatMediumDate(_consumedAt)} · ${TimeOfDay.fromDateTime(_consumedAt).format(context)}',
+                    ),
+                  ),
+                  if (_uncertainSave)
+                    TextButton(
+                      onPressed: _leave,
+                      child: const Text('Salir para revisar el historial'),
+                    ),
+
                   Text(
                     _foods!.isEmpty
                         ? 'No identificamos alimentos en esta foto'
@@ -304,22 +431,8 @@ class _PhotoAnalysisPageState extends ConsumerState<PhotoAnalysisPage> {
                   PhotoFoodReview(
                     key: ObjectKey(_foods),
                     detected: _foods!,
-                    onConfirm: (entries) async {
-                      final saved = await context.push<bool>(
-                        '/meals/create',
-                        extra: PhotoMealDraft(_image!, entries),
-                      );
-                      if (!mounted || saved != true) return;
-                      setState(() => _allowExit = true);
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (!context.mounted) return;
-                        if (context.canPop()) {
-                          context.pop(true);
-                        } else {
-                          context.go('/home');
-                        }
-                      });
-                    },
+                    canConfirm: !_uncertainSave && !_saving,
+                    onConfirm: _savePhoto,
                   ),
                   const SizedBox(height: 16),
                 ],
@@ -330,34 +443,42 @@ class _PhotoAnalysisPageState extends ConsumerState<PhotoAnalysisPage> {
                     label: const Text('Analizar foto'),
                   ),
                 const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : () => _pick(ImageSource.camera),
-                  icon: const Icon(Icons.camera_alt_outlined),
-                  label: const Text('Tomar foto'),
-                ),
+                if (_foods == null || _foods!.isEmpty)
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : () => _pick(ImageSource.camera),
+                    icon: const Icon(Icons.camera_alt_outlined),
+                    label: const Text('Tomar foto'),
+                  ),
                 const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : () => _pick(ImageSource.gallery),
-                  icon: const Icon(Icons.photo_library_outlined),
-                  label: const Text('Elegir de la galería'),
-                ),
-                TextButton(
-                  onPressed: _busy
-                      ? null
-                      : () async {
-                          if (!await _confirmDiscard() || !context.mounted) {
-                            return;
-                          }
-                          setState(() => _foods = null);
-                          final saved = await context.push<bool>(
-                            '/meals/create',
-                          );
-                          if (context.mounted && saved == true) {
-                            context.pop(true);
-                          }
-                        },
-                  child: const Text('Registrar manualmente'),
-                ),
+                if (_foods == null || _foods!.isEmpty)
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : () => _pick(ImageSource.gallery),
+                    icon: const Icon(Icons.photo_library_outlined),
+                    label: const Text('Elegir de la galería'),
+                  ),
+                if (_foods != null)
+                  TextButton(
+                    onPressed: _busy ? null : _leave,
+                    child: const Text('Descartar análisis'),
+                  ),
+                if (_foods == null || _foods!.isEmpty)
+                  TextButton(
+                    onPressed: _busy
+                        ? null
+                        : () async {
+                            if (!await _confirmDiscard() || !context.mounted) {
+                              return;
+                            }
+                            setState(() => _foods = null);
+                            final saved = await context.push<bool>(
+                              '/meals/create',
+                            );
+                            if (context.mounted && saved == true) {
+                              context.pop(true);
+                            }
+                          },
+                    child: const Text('Registrar manualmente'),
+                  ),
               ],
             ),
           ),

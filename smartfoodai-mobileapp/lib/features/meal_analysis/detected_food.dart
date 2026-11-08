@@ -1,10 +1,12 @@
 class DetectedFood {
   final String name;
+  final String? nutritionQuery;
   final double? estimatedGrams;
   final String? confidence, confidenceReason;
   const DetectedFood(
     this.name,
     this.estimatedGrams, {
+    this.nutritionQuery,
     this.confidence,
     this.confidenceReason,
   });
@@ -49,9 +51,15 @@ class DetectedFood {
                 reason.length > 200)) {
           throw const FormatException('Invalid confidence');
         }
+        final query = item['nutritionQuery'];
+        if (query != null &&
+            (query is! String || query.trim().isEmpty || query.length > 120)) {
+          throw const FormatException('Invalid nutrition query');
+        }
         return DetectedFood(
           name,
           (grams as num?)?.toDouble(),
+          nutritionQuery: query as String?,
           confidence: confidence as String?,
           confidenceReason: reason as String?,
         );

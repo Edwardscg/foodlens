@@ -21,7 +21,11 @@ class MealEntry {
   double scaled(double value) =>
       double.parse((value * factor).toStringAsFixed(2));
   Map<String, dynamic> toJson() => {
-    'foodId': food.id,
+    if (food.externalFdcId == null) 'foodId': food.id,
+    if (food.externalFdcId != null) ...{
+      'externalFdcId': food.externalFdcId,
+      'externalName': food.name,
+    },
     'quantity': quantity,
     'unit': food.basis == NutritionBasis.per100g ? 'GRAMS' : 'SERVINGS',
   };

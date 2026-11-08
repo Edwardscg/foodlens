@@ -14,8 +14,19 @@ public record CreateMealRequest(
         @NotBlank @Size(max = 64) String timeZone,
         @NotEmpty @Size(max = 50) List<@NotNull @Valid Item> items) {
     public record Item(
-            @NotNull @Positive Long foodId,
+            @Positive Long foodId,
             @NotNull @DecimalMin("0.01") @DecimalMax("10000")
             @Digits(integer = 5, fraction = 2) BigDecimal quantity,
-            @NotNull MealUnit unit) {}
+            @NotNull MealUnit unit,
+            @Positive Long externalFdcId,
+            @Size(max = 120) String externalName) {
+        public Item(Long foodId, BigDecimal quantity, MealUnit unit) {
+            this(foodId, quantity, unit, null, null);
+        }
+        @AssertTrue(message = "Selecciona una única fuente de alimento válida")
+        public boolean isSourceValid() {
+            return (foodId != null && externalFdcId == null && externalName == null)
+                    || (foodId == null && externalFdcId != null && externalName != null && !externalName.isBlank());
+        }
+    }
 }

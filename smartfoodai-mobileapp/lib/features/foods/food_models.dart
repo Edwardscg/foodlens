@@ -6,18 +6,22 @@ enum NutritionBasis {
   final String label;
   const NutritionBasis(this.apiValue, this.label);
   static NutritionBasis fromApi(Object? value) => values.firstWhere(
-        (basis) => basis.apiValue == value,
+    (basis) => basis.apiValue == value,
     orElse: () => throw const FormatException('Invalid nutrition basis'),
   );
 }
 
 class CustomFood {
   final int id;
+  final int? externalFdcId;
+  final String? sourceName;
   final String name;
   final NutritionBasis basis;
   final double calories, proteinG, carbsG, fatG;
   const CustomFood({
     required this.id,
+    this.externalFdcId,
+    this.sourceName,
     required this.name,
     required this.basis,
     required this.calories,
@@ -73,8 +77,8 @@ class FoodPage {
       items
           .map(
             (item) =>
-            CustomFood.fromJson(Map<String, dynamic>.from(item as Map)),
-      )
+                CustomFood.fromJson(Map<String, dynamic>.from(item as Map)),
+          )
           .toList(),
       page,
       pages,

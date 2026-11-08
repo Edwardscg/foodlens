@@ -9,22 +9,28 @@ const fatColor = Color(0xFF758179);
 
 class MacroSummary extends StatelessWidget {
   final double carbs, protein, fat;
+  final bool energyDistribution;
   const MacroSummary({
     super.key,
+    this.energyDistribution = false,
     required this.carbs,
     required this.protein,
     required this.fat,
   });
   @override
   Widget build(BuildContext context) {
-    final values = [carbs, protein, fat];
+    final values = energyDistribution
+        ? [carbs * 4, protein * 4, fat * 9]
+        : [carbs, protein, fat];
     final colors = [carbColor, proteinColor, fatColor];
-    final total = carbs + protein + fat;
+    final total = values.reduce((a, b) => a + b);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Semantics(
-          label: 'Distribución de macronutrientes por gramos',
+          label: energyDistribution
+              ? 'Distribución calórica de macronutrientes'
+              : 'Distribución de macronutrientes por gramos',
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: SizedBox(

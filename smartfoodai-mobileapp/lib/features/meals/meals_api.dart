@@ -45,6 +45,9 @@ class MealsApi {
         options: Options(
           headers: {'Authorization': 'Bearer $token'},
           sendTimeout: const Duration(seconds: 30),
+          receiveTimeout: image == null
+              ? const Duration(seconds: 15)
+              : const Duration(seconds: 90),
         ),
         data: image == null
             ? meal
