@@ -74,11 +74,23 @@ public class GeminiAnalysisService {
             var request = HttpRequest.newBuilder(URI.create(endpoint + model + ":generateContent"))
                     .timeout(Duration.ofSeconds(45)).header("Content-Type", "application/json")
                     .header("x-goog-api-key", apiKey).POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build();
-            log.info("photo-analysis id={} event=gemini-request", diagnosticId);
+            log.info("photo-analysis id={} event=gemini-request model={}", diagnosticId, model);
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(45);
             var pending = http.sendAsync(request, HttpResponse.BodyHandlers.ofString());
             try {
                 var response = pending.get(45, TimeUnit.SECONDS);
                 log.info("photo-analysis id={} event=gemini-response http={}", diagnosticId, response.statusCode());
+                if (response.statusCode() == 503 && deadline - System.nanoTime() > TimeUnit.SECONDS.toNanos(2)) {
+                    log.info("photo-analysis id={} event=retry reason=provider-503", diagnosticId);
+                    TimeUnit.SECONDS.sleep(1);
+                    long remaining = deadline - System.nanoTime();
+                    if (remaining <= 0) throw new java.util.concurrent.TimeoutException();
+                    pending = http.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+                    response = pending.get(remaining, TimeUnit.NANOSECONDS);
+                    log.info("photo-analysis id={} event=gemini-response attempt=2 http={}", diagnosticId, response.statusCode());
+                }
+                if (response.statusCode() == 503) throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE,
+                        "El servicio de análisis está temporalmente no disponible. Inténtalo más tarde o registra la comida manualmente.");
                 if (response.statusCode() == 429) throw new ApiException(HttpStatus.TOO_MANY_REQUESTS,
                         "El análisis está ocupado. Espera un momento o usa registro manual.");
                 if (response.statusCode() != 200 || response.body().length() > 262144) throw unavailable();
