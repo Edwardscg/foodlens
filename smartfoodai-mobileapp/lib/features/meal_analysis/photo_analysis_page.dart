@@ -13,6 +13,8 @@ import '../auth/auth_models.dart';
 import 'detected_food.dart';
 import 'photo_analysis_api.dart';
 import 'photo_food_review.dart';
+import 'photo_review_widgets.dart';
+import '../../core/app_theme.dart';
 import '../meals/meals_api.dart';
 import '../meals/meal_models.dart';
 
@@ -315,9 +317,24 @@ class _PhotoAnalysisPageState extends ConsumerState<PhotoAnalysisPage> {
     },
     child: Scaffold(
       appBar: AppBar(
-        title: Text(_foods == null ? 'Analizar comida' : 'Revisar alimentos'),
+        actions: [
+          IconButton(
+            tooltip: 'Mi cuenta',
+            onPressed: _saving ? null : () => context.push('/account'),
+            icon: const CircleAvatar(
+              radius: 16,
+              backgroundColor: AppTheme.green,
+              child: Icon(Icons.person_outline, color: Colors.white, size: 19),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+        title: Text(
+          _foods == null ? 'Analizar comida' : 'Revisar Alimentos',
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+        ),
         leading: IconButton(
-          onPressed: _leave,
+          onPressed: _saving ? null : _leave,
           tooltip: 'Volver',
           icon: const Icon(Icons.arrow_back),
         ),
@@ -327,42 +344,117 @@ class _PhotoAnalysisPageState extends ConsumerState<PhotoAnalysisPage> {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 560),
             child: ListView(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
               children: [
-                Text(
-                  _foods != null
-                      ? 'Visión asistida · ${_foods!.length} detectados'
-                      : _image == null
-                      ? 'Añadir una foto'
-                      : 'Revisa tu foto',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 12),
-                if (_foods == null)
+                if (_foods != null && _image != null) ...[
+                  PhotoReviewCard(
+                    child: Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.memory(
+                            _image!,
+                            width: 64,
+                            height: 64,
+                            fit: BoxFit.cover,
+                            cacheWidth: 160,
+                            semanticLabel: 'Foto de la comida',
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'VISIÓN ASISTIDA • ${_foods!.length} detectados',
+                                style: const TextStyle(
+                                  color: AppTheme.green,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              PopupMenuButton<MealType>(
+                                tooltip: 'Cambiar tipo de comida',
+                                enabled: !_busy && !_uncertainSave,
+                                onSelected: (value) =>
+                                    setState(() => _mealType = value),
+                                itemBuilder: (_) => MealType.values
+                                    .map(
+                                      (type) => PopupMenuItem(
+                                        value: type,
+                                        child: Text(type.label),
+                                      ),
+                                    )
+                                    .toList(),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 4,
+                                  ),
+                                  child: Text(
+                                    'Comida (${_mealType.label})',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              InkWell(
+                                onTap: _busy || _uncertainSave
+                                    ? null
+                                    : _editWhen,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 4,
+                                  ),
+                                  child: Text(
+                                    'Foto analizada · ${DateUtils.isSameDay(_consumedAt, DateTime.now()) ? "Hoy" : MaterialLocalizations.of(context).formatShortDate(_consumedAt)}, ${TimeOfDay.fromDateTime(_consumedAt).format(context)}',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: AppTheme.muted,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ] else ...[
+                  Text(
+                    _image == null ? 'Añadir una foto' : 'Revisa tu foto',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 12),
                   const Text(
                     'Centra el plato y usa buena iluminación. La foto se enviará para analizarla solo cuando pulses Analizar.',
                   ),
-                const SizedBox(height: 20),
-                if (_image != null) ...[
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Image.memory(
-                      _image!,
-                      height: _foods == null ? 260 : 96,
-                      fit: BoxFit.contain,
-                      cacheWidth: 1000,
-                      semanticLabel: 'Foto seleccionada para analizar',
-                      errorBuilder: (_, _, _) => const Text(
-                        'No se puede mostrar la foto. Elige otra imagen.',
+                  const SizedBox(height: 20),
+                  if (_image != null)
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.memory(
+                        _image!,
+                        height: 260,
+                        fit: BoxFit.contain,
+                        cacheWidth: 1000,
+                        semanticLabel: 'Foto seleccionada para analizar',
+                        errorBuilder: (_, _, _) => const Text(
+                          'No se puede mostrar la foto. Elige otra imagen.',
+                        ),
                       ),
                     ),
+                ],
+                if (_message != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Semantics(liveRegion: true, child: Text(_message!)),
                   ),
-                  const SizedBox(height: 16),
-                ],
-                if (_message != null) ...[
-                  Semantics(liveRegion: true, child: Text(_message!)),
-                  const SizedBox(height: 16),
-                ],
                 if (_busy) ...[
                   const Center(child: CircularProgressIndicator()),
                   const SizedBox(height: 12),
@@ -382,86 +474,45 @@ class _PhotoAnalysisPageState extends ConsumerState<PhotoAnalysisPage> {
                   const SizedBox(height: 16),
                 ],
                 if (_foods != null) ...[
-                  DropdownButtonFormField<MealType>(
-                    initialValue: _mealType,
-                    decoration: const InputDecoration(
-                      labelText: 'Tipo de comida',
-                    ),
-                    items: MealType.values
-                        .map(
-                          (type) => DropdownMenuItem(
-                            value: type,
-                            child: Text(type.label),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: _busy || _uncertainSave
-                        ? null
-                        : (value) {
-                            if (value != null) {
-                              setState(() => _mealType = value);
-                            }
-                          },
-                  ),
-                  TextButton.icon(
-                    onPressed: _busy || _uncertainSave ? null : _editWhen,
-                    icon: const Icon(Icons.schedule),
-                    label: Text(
-                      '${MaterialLocalizations.of(context).formatMediumDate(_consumedAt)} · ${TimeOfDay.fromDateTime(_consumedAt).format(context)}',
-                    ),
-                  ),
                   if (_uncertainSave)
                     TextButton(
                       onPressed: _leave,
                       child: const Text('Salir para revisar el historial'),
                     ),
-
-                  Text(
-                    _foods!.isEmpty
-                        ? 'No identificamos alimentos en esta foto'
-                        : 'Alimentos detectados',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _foods!.isEmpty
-                        ? 'Prueba con otra imagen o registra tu comida manualmente.'
-                        : 'Las cantidades de la foto son estimaciones: revísalas antes de registrar tu comida.',
-                  ),
                   PhotoFoodReview(
                     key: ObjectKey(_foods),
                     detected: _foods!,
                     canConfirm: !_uncertainSave && !_saving,
                     onConfirm: _savePhoto,
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: _busy ? null : _leave,
+                    style: TextButton.styleFrom(foregroundColor: AppTheme.ink),
+                    child: const Text('Descartar análisis'),
+                  ),
                 ],
-                if (_image != null && _foods == null)
+                if (_image != null && _foods == null) ...[
+                  const SizedBox(height: 16),
                   FilledButton.icon(
                     onPressed: _busy ? null : _analyze,
                     icon: const Icon(Icons.auto_awesome_outlined),
                     label: const Text('Analizar foto'),
                   ),
-                const SizedBox(height: 12),
-                if (_foods == null || _foods!.isEmpty)
+                ],
+                if (_foods == null || _foods!.isEmpty) ...[
+                  const SizedBox(height: 12),
                   OutlinedButton.icon(
                     onPressed: _busy ? null : () => _pick(ImageSource.camera),
                     icon: const Icon(Icons.camera_alt_outlined),
                     label: const Text('Tomar foto'),
                   ),
-                const SizedBox(height: 8),
-                if (_foods == null || _foods!.isEmpty)
+                  const SizedBox(height: 8),
                   OutlinedButton.icon(
                     onPressed: _busy ? null : () => _pick(ImageSource.gallery),
                     icon: const Icon(Icons.photo_library_outlined),
                     label: const Text('Elegir de la galería'),
                   ),
-                if (_foods != null)
-                  TextButton(
-                    onPressed: _busy ? null : _leave,
-                    child: const Text('Descartar análisis'),
-                  ),
-                if (_foods == null || _foods!.isEmpty)
                   TextButton(
                     onPressed: _busy
                         ? null
@@ -479,6 +530,7 @@ class _PhotoAnalysisPageState extends ConsumerState<PhotoAnalysisPage> {
                           },
                     child: const Text('Registrar manualmente'),
                   ),
+                ],
               ],
             ),
           ),

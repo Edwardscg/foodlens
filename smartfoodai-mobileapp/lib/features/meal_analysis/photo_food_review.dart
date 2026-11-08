@@ -9,7 +9,8 @@ import 'package:go_router/go_router.dart';
 
 import '../auth/auth_controller.dart';
 import '../foods/food_models.dart';
-import '../foods/food_widgets.dart';
+import '../../core/app_theme.dart';
+import 'photo_review_widgets.dart';
 import '../foods/foods_api.dart';
 import '../meals/meal_food_picker.dart';
 import '../meals/meal_models.dart';
@@ -116,6 +117,24 @@ class _PhotoFoodReviewState extends ConsumerState<PhotoFoodReview> {
     }
   }
 
+  Future<void> _showDetails(ReviewFood item) => showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(item.food?.name ?? item.detectedName),
+      content: Text(
+        'Confianza de identificación: ${item.detection.confidenceLabel}.\n'
+        '${item.detection.confidenceReason ?? "Estimación orientativa; revisa alimento y cantidad."}\n\n'
+        'Referencia nutricional: ${item.food?.sourceName ?? "Pendiente"}',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('Cerrar'),
+        ),
+      ],
+    ),
+  );
+
   @override
   Widget build(BuildContext context) {
     final entries = _items
@@ -130,183 +149,56 @@ class _PhotoFoodReviewState extends ConsumerState<PhotoFoodReview> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Revisar alimentos',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Revisa los alimentos vinculados y ajusta las cantidades estimadas antes de guardar.',
-        ),
-        const SizedBox(height: 16),
         if (_resolving) ...[
           const LinearProgressIndicator(),
           const SizedBox(height: 8),
           const Text('Buscando coincidencias nutricionales…'),
+          const SizedBox(height: 20),
         ],
         if (complete)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${foodNumber(total((food) => food.calories))} kcal',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  if (entries.every(
-                    (entry) => entry.food.basis == NutritionBasis.per100g,
-                  ))
-                    Text(
-                      'Total ración: ${foodNumber(entries.fold<double>(0, (sum, entry) => sum + entry.quantity))} g',
-                    ),
-                  const SizedBox(height: 12),
-                  MacroSummary(
-                    energyDistribution: true,
-                    carbs: total((food) => food.carbsG),
-                    protein: total((food) => food.proteinG),
-                    fat: total((food) => food.fatG),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Estimación del borrador. Todavía no se ha registrado la comida.',
-                  ),
-                ],
-              ),
-            ),
+          PhotoNutritionSummary(
+            calories: total((food) => food.calories),
+            carbs: total((food) => food.carbsG),
+            protein: total((food) => food.proteinG),
+            fat: total((food) => food.fatG),
+            grams:
+                entries.every(
+                  (entry) => entry.food.basis == NutritionBasis.per100g,
+                )
+                ? entries.fold<double>(0, (sum, entry) => sum + entry.quantity)
+                : null,
           )
-        else
-          Padding(
-            padding: const EdgeInsets.only(bottom: 16),
+        else if (!_resolving)
+          PhotoReviewCard(
             child: Text(
-              _items.isEmpty ? 'Añade al menos un alimento.' : 'Completa los alimentos y sus cantidades para calcular el aporte nutricional.',
+              _items.isEmpty ? 'Añade al menos un alimento.' : 'Completa las coincidencias y cantidades para calcular el aporte nutricional.',
             ),
           ),
-        for (final item in _items)
-          Card(
-            key: ObjectKey(item),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    item.food?.name ?? item.detectedName,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  if (item.detectedName.isNotEmpty)
-                    ExpansionTile(
-                      tilePadding: EdgeInsets.zero,
-                      title: Text(
-                        'Confianza ${item.detection.confidenceLabel.toLowerCase()}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                      children: [
-                        if (item.detection.confidenceReason != null)
-                          Text(item.detection.confidenceReason!),
-                        const Text(
-                          'Valoración orientativa de la identificación original; revisa el alimento y la cantidad.',
-                        ),
-                        if (item.food?.sourceName != null)
-                          Text(
-                            'Referencia nutricional: ${item.food!.sourceName}',
-                          ),
-                      ],
-                    ),
-                  if (item.resolutionError != null) Text(item.resolutionError!),
-                  if (item.entry != null) ...[
-                    Text(
-                      '${foodNumber(item.entry!.scaled(item.food!.calories))} kcal',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    Text(
-                      'C: ${foodNumber(item.entry!.scaled(item.food!.carbsG))} g · '
-                      'P: ${foodNumber(item.entry!.scaled(item.food!.proteinG))} g · '
-                      'G: ${foodNumber(item.entry!.scaled(item.food!.fatG))} g',
-                    ),
-                  ],
-                  if (item.food != null) ...[
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      key: ValueKey(item.quantityRevision),
-                      initialValue: item.quantity,
-                      enabled: !_busy,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                      decoration: InputDecoration(
-                        labelText: 'Cantidad editable',
-                        prefixIcon: IconButton(
-                          tooltip: 'Reducir cantidad',
-                          onPressed: _busy
-                              ? null
-                              : () => setState(
-                                  () => item.adjust(
-                                    item.food!.basis == NutritionBasis.per100g
-                                        ? -10
-                                        : -1,
-                                  ),
-                                ),
-                          icon: const Icon(Icons.remove),
-                        ),
-                        suffixIcon: IconButton(
-                          tooltip: 'Aumentar cantidad',
-                          onPressed: _busy
-                              ? null
-                              : () => setState(
-                                  () => item.adjust(
-                                    item.food!.basis == NutritionBasis.per100g
-                                        ? 10
-                                        : 1,
-                                  ),
-                                ),
-                          icon: const Icon(Icons.add),
-                        ),
-                        suffixText: item.food!.basis == NutritionBasis.per100g
-                            ? 'g'
-                            : 'porciones',
-                      ),
-                      onChanged: (value) =>
-                          setState(() => item.quantity = value),
-                      validator: (_) => item.validQuantity == null
-                          ? 'Introduce de 0,01 a 10.000, con hasta 2 decimales.'
-                          : null,
-                    ),
-                  ],
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      TextButton.icon(
-                        onPressed: _busy ? null : () => _choose(item),
-                        icon: const Icon(Icons.search),
-                        label: Text(
-                          item.food == null
-                              ? 'Elegir alimento'
-                              : 'Cambiar alimento',
-                        ),
-                      ),
-                      TextButton.icon(
-                        onPressed: _busy
-                            ? null
-                            : () => setState(() => _items.remove(item)),
-                        icon: const Icon(Icons.delete_outline),
-                        label: const Text('Quitar'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        OutlinedButton.icon(
-          onPressed: _busy || _items.length >= 50 ? null : () => _choose(),
-          icon: const Icon(Icons.add),
-          label: const Text('Añadir alimento'),
+        const SizedBox(height: 26),
+        const Text(
+          'Alimentos detectados',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
+        for (final item in _items) ...[
+          _foodCard(item),
+          const SizedBox(height: 14),
+        ],
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: _busy || _items.length >= 50 ? null : () => _choose(),
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Añadir alimento'),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.green),
+          ),
+        ),
+        const SizedBox(height: 22),
         FilledButton.icon(
+          style: FilledButton.styleFrom(
+            shape: const StadiumBorder(),
+            minimumSize: const Size.fromHeight(54),
+          ),
           onPressed: !complete || _busy || !widget.canConfirm
               ? null
               : () async {
@@ -321,6 +213,201 @@ class _PhotoFoodReviewState extends ConsumerState<PhotoFoodReview> {
           label: const Text('Guardar comida'),
         ),
       ],
+    );
+  }
+
+  Widget _foodCard(ReviewFood item) {
+    final food = item.food;
+    final entry = item.entry;
+    final grams = food?.basis == NutritionBasis.per100g;
+    Widget macro(String label, double value, Color color) => Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: '● ',
+              style: TextStyle(color: color, fontSize: 8),
+            ),
+            TextSpan(text: '${foodNumber(value)} g $label'),
+          ],
+        ),
+        style: const TextStyle(fontSize: 10),
+      ),
+    );
+    return PhotoReviewCard(
+      key: ObjectKey(item),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () => _showDetails(item),
+                  child: Text(
+                    food?.name ?? item.detectedName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                entry == null
+                    ? '— kcal'
+                    : '${foodNumber(entry.scaled(food!.calories))} kcal',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (food != null)
+            Container(
+              padding: const EdgeInsets.only(
+                left: 12,
+                right: 4,
+                top: 6,
+                bottom: 6,
+              ),
+              decoration: BoxDecoration(
+                color: photoInset,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Cantidad editable',
+                      style: TextStyle(fontSize: 11, color: AppTheme.muted),
+                    ),
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: 'Reducir cantidad',
+                          iconSize: 18,
+                          visualDensity: VisualDensity.compact,
+                          onPressed: _busy
+                              ? null
+                              : () => setState(
+                                  () => item.adjust(grams ? -10 : -1),
+                                ),
+                          icon: const Icon(Icons.remove),
+                        ),
+                        SizedBox(
+                          width: 48,
+                          child: TextFormField(
+                            key: ValueKey(item.quantityRevision),
+                            initialValue: item.quantity,
+                            enabled: !_busy,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              filled: false,
+                              contentPadding: EdgeInsets.symmetric(vertical: 8),
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                            ),
+                            onChanged: (value) =>
+                                setState(() => item.quantity = value),
+                          ),
+                        ),
+                        Text(
+                          grams ? 'g' : 'porc.',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.muted,
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Aumentar cantidad',
+                          iconSize: 18,
+                          visualDensity: VisualDensity.compact,
+                          onPressed: _busy
+                              ? null
+                              : () =>
+                                    setState(() => item.adjust(grams ? 10 : 1)),
+                          icon: const Icon(Icons.add),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (food != null && item.validQuantity == null)
+            const Padding(
+              padding: EdgeInsets.only(top: 6),
+              child: Text(
+                'Introduce de 0,01 a 10.000, con hasta 2 decimales.',
+                style: TextStyle(fontSize: 11, color: Colors.red),
+              ),
+            ),
+          if (item.resolutionError != null)
+            Text(item.resolutionError!, style: const TextStyle(fontSize: 12)),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: entry == null
+                    ? Text(
+                        _resolving ? 'Vinculando…' : 'Pendiente de vincular',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.muted,
+                        ),
+                      )
+                    : Wrap(
+                        children: [
+                          macro('C', entry.scaled(food!.carbsG), photoCarbs),
+                          macro('P', entry.scaled(food.proteinG), photoProtein),
+                          macro('G', entry.scaled(food.fatG), photoFat),
+                        ],
+                      ),
+              ),
+              IconButton(
+                tooltip: food == null ? 'Elegir alimento' : 'Cambiar alimento',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.edit_outlined, size: 20),
+                onPressed: _busy ? null : () => _choose(item),
+              ),
+              IconButton(
+                tooltip: 'Eliminar alimento',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(
+                  Icons.delete_outline,
+                  size: 20,
+                  color: Color(0xFFC7463D),
+                ),
+                onPressed: _busy
+                    ? null
+                    : () => setState(() => _items.remove(item)),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
